@@ -4,7 +4,7 @@ import { attachStream, cameraErrorMessage, openCamera } from "./camera";
 import { fleetById } from "./catalog";
 import { requestMotionPermission } from "./gps";
 import { BoxKalman } from "./kalman";
-import { findMovingRegions, grabPatch, isVehicleLike, pickLock, rgbaToGray, trackPatch } from "./motion";
+import { boxIou, findMovingRegions, grabPatch, isVehicleLike, pickLock, rgbaToGray, trackPatch } from "./motion";
 import { assumedSpanM, lookupWheelbase } from "./wheelbase";
 import { FlowTracker, flowSpeedMps } from "./optical-flow";
 import {
@@ -203,6 +203,7 @@ export function useVeloxEngine(refs: EngineRefs) {
     let tmplH = 0;
     let tmplBox: BBox | null = null;
     let tmplAge = 0;
+    let tmplMiss = 0;
 
     const analysis = refsRef.current.analysisRef.current;
     if (analysis) {
@@ -294,30 +295,16 @@ export function useVeloxEngine(refs: EngineRefs) {
             raw: b,
           }));
           for (const m of mapped) boxes.push({ id: m.id, bbox: m.bbox });
-          const aim = pendingAim && now - pendingAim.at < 4000 ? pendingAim : null;
+          const sized = found.filter((b) => b.w < ANALYSIS_W * 0.44 && b.h < ANALYSIS_H * 0.36);
           const freshTap = pendingAim != null && now - pendingAim.at < 220;
-          let chosen = pickLock(
-            found.filter((b) => b.w < ANALYSIS_W * 0.44 && b.h < ANALYSIS_H * 0.36),
-            ANALYSIS_W,
-            ANALYSIS_H,
-            lastLockId,
-            lastBox
-              ? {
-                  x: lastBox.x / sx,
-                  y: lastBox.y / sy,
-                  w: lastBox.w / sx,
-                  h: lastBox.h / sy,
-                }
-              : null,
-            null,
-          );
+          let chosen: (typeof found)[number] | null = null;
           if (freshTap && pendingAim) {
             tmpl = null;
             tmplBox = null;
+            tmplMiss = 0;
             const ax = pendingAim.nx * ANALYSIS_W;
             const ay = pendingAim.ny * ANALYSIS_H;
-            const near = found
-              .filter((b) => b.w < ANALYSIS_W * 0.44 && b.h < ANALYSIS_H * 0.36)
+            const near = sized
               .map((b) => {
                 const dx = b.x + b.w / 2 - ax;
                 const dy = b.y + b.h / 2 - ay;
@@ -336,9 +323,34 @@ export function useVeloxEngine(refs: EngineRefs) {
           } else if (tmpl && tmplBox) {
             const moved = trackPatch(gray, tmpl, tmplW, tmplH, ANALYSIS_W, ANALYSIS_H, tmplBox);
             if (moved) {
-              chosen = { ...moved, score: chosen?.score ?? 500 };
-              tmplBox = moved;
+              tmplMiss = 0;
+              const overlap = sized.find((b) => boxIou(b, moved) > 0.12);
+              chosen = overlap
+                ? {
+                    x: moved.x * 0.7 + overlap.x * 0.3,
+                    y: moved.y * 0.7 + overlap.y * 0.3,
+                    w: moved.w * 0.75 + overlap.w * 0.25,
+                    h: moved.h * 0.75 + overlap.h * 0.25,
+                    score: 800,
+                  }
+                : { ...moved, score: 800 };
+              tmplBox = chosen;
+            } else {
+              tmplMiss++;
+              if (tmplMiss > 14) {
+                tmpl = null;
+                tmplBox = null;
+              }
             }
+          } else {
+            chosen = pickLock(sized, ANALYSIS_W, ANALYSIS_H, lastLockId, lastBox
+              ? {
+                  x: lastBox.x / sx,
+                  y: lastBox.y / sy,
+                  w: lastBox.w / sx,
+                  h: lastBox.h / sy,
+                }
+              : null, null);
           }
           const bbox = chosen
             ? {
@@ -353,18 +365,11 @@ export function useVeloxEngine(refs: EngineRefs) {
             ? (settings.assumedWidthM * f) / Math.max(8, bbox.w)
             : 0;
           const vehicle =
-            bbox && (aim || isVehicleLike(bbox, canvasW, canvasH, distGuess)) ? bbox : null;
+            bbox && (freshTap || tmpl != null || isVehicleLike(bbox, canvasW, canvasH, distGuess))
+              ? bbox
+              : null;
 
           if (vehicle && chosen) {
-            if (lastBox) {
-              const x1 = Math.max(lastBox.x, vehicle.x);
-              const y1 = Math.max(lastBox.y, vehicle.y);
-              const x2 = Math.min(lastBox.x + lastBox.w, vehicle.x + vehicle.w);
-              const y2 = Math.min(lastBox.y + lastBox.h, vehicle.y + vehicle.h);
-              const inter = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
-              const union = lastBox.w * lastBox.h + vehicle.w * vehicle.h - inter;
-              if (union > 0 && inter / union < 0.1) range.reset();
-            }
             kf.predict(dt);
             kf.update(vehicle, dt);
             const filtered = kf.box();
@@ -390,7 +395,7 @@ export function useVeloxEngine(refs: EngineRefs) {
               flowV.speedMps,
               flowV.confidence,
             );
-            if (!tmpl || aim) {
+            if (!tmpl) {
               const p = grabPatch(gray, ANALYSIS_W, ANALYSIS_H, chosen);
               tmpl = p.data;
               tmplW = p.tw;
@@ -399,12 +404,11 @@ export function useVeloxEngine(refs: EngineRefs) {
               tmplAge = 0;
             } else {
               tmplAge++;
-              if (tmplAge % 8 === 0) {
+              if (tmplAge % 10 === 0) {
                 const p = grabPatch(gray, ANALYSIS_W, ANALYSIS_H, chosen);
                 tmpl = p.data;
                 tmplW = p.tw;
                 tmplH = p.th;
-                tmplBox = p.box;
               }
             }
             lock = {
@@ -442,6 +446,7 @@ export function useVeloxEngine(refs: EngineRefs) {
         range.reset();
         tmpl = null;
         tmplBox = null;
+        tmplMiss = 0;
       }
 
       lastLockId = lock?.id ?? null;

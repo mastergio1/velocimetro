@@ -147,7 +147,7 @@ export function pickLock(
     let sticky: MotionBox | null = null;
     let stickyIou = 0;
     for (const b of pool) {
-      const o = iou(b, prevBox);
+      const o = boxIou(b, prevBox);
       if (o > stickyIou) {
         stickyIou = o;
         sticky = b;
@@ -182,7 +182,7 @@ function dist2(b: BBox, cx: number, cy: number) {
   return dx * dx + dy * dy * 0.55;
 }
 
-function iou(a: BBox, b: BBox) {
+export function boxIou(a: BBox, b: BBox) {
   const x1 = Math.max(a.x, b.x);
   const y1 = Math.max(a.y, b.y);
   const x2 = Math.min(a.x + a.w, b.x + b.w);
@@ -224,31 +224,43 @@ export function trackPatch(
   width: number,
   height: number,
   guess: BBox,
-  search = 14,
+  search = 22,
 ): BBox | null {
   const gx = Math.round(guess.x);
   const gy = Math.round(guess.y);
+  const sad = (x0: number, y0: number) => {
+    if (x0 < 0 || y0 < 0 || x0 + tw > width || y0 + th > height) return 1e15;
+    let s = 0;
+    for (let y = 0; y < th; y++) {
+      const fr = (y0 + y) * width + x0;
+      const tr = y * tw;
+      for (let x = 0; x < tw; x++) s += Math.abs((frame[fr + x] ?? 0) - (tmpl[tr + x] ?? 0));
+    }
+    return s;
+  };
   let best = 1e15;
   let bx = gx;
   let by = gy;
-  for (let dy = -search; dy <= search; dy++) {
-    for (let dx = -search; dx <= search; dx++) {
-      const x0 = gx + dx;
-      const y0 = gy + dy;
-      if (x0 < 0 || y0 < 0 || x0 + tw > width || y0 + th > height) continue;
-      let s = 0;
-      for (let y = 0; y < th; y++) {
-        const fr = (y0 + y) * width + x0;
-        const tr = y * tw;
-        for (let x = 0; x < tw; x++) s += Math.abs((frame[fr + x] ?? 0) - (tmpl[tr + x] ?? 0));
-      }
+  for (let dy = -search; dy <= search; dy += 2) {
+    for (let dx = -search; dx <= search; dx += 2) {
+      const s = sad(gx + dx, gy + dy);
       if (s < best) {
         best = s;
-        bx = x0;
-        by = y0;
+        bx = gx + dx;
+        by = gy + dy;
       }
     }
   }
-  if (best / (tw * th) > 48) return null;
+  for (let dy = -2; dy <= 2; dy++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      const s = sad(bx + dx, by + dy);
+      if (s < best) {
+        best = s;
+        bx = bx + dx;
+        by = by + dy;
+      }
+    }
+  }
+  if (best / (tw * th) > 72) return null;
   return { x: bx, y: by, w: guess.w, h: guess.h };
 }
