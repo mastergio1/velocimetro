@@ -31,6 +31,7 @@ export async function playDemo(video: HTMLVideoElement | null) {
   }
   video.loop = true;
   video.muted = true;
+  video.autoplay = true;
   video.playsInline = true;
   video.setAttribute("playsinline", "true");
   video.setAttribute("webkit-playsinline", "true");
