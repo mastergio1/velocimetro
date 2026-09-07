@@ -59,5 +59,6 @@ export function assumedSpanM(
 ): number {
   const aspect = bbox.w / Math.max(1, bbox.h);
   if (wheelbaseM && aspect > 2.05) return wheelbaseM;
+  if (aspect > 2.4) return Math.max(widthM, 3.1);
   return widthM;
 }

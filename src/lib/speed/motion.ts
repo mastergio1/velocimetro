@@ -25,12 +25,12 @@ export function roadScore(b: BBox, frameH: number): number {
 }
 export function isVehicleLike(b: BBox, frameW: number, frameH: number, distM?: number): boolean {
   const aspect = b.w / Math.max(1, b.h);
-  if (aspect < 0.85 || aspect > 4.6) return false;
-  if (b.h > frameH * 0.4) return false;
-  if (b.w > frameW * 0.46) return false;
+  if (aspect < 0.85 || aspect > 4.8) return false;
+  if (b.h > frameH * 0.52) return false;
+  if (b.w > frameW * 0.74) return false;
   const cy = b.y + b.h / 2;
-  if (cy < frameH * 0.3 || cy > frameH * 0.78) return false;
-  if (distM != null && distM < 3.2) return false;
+  if (cy < frameH * 0.26 || cy > frameH * 0.68) return false;
+  if (distM != null && distM < 2.4) return false;
   return true;
 }
 
@@ -139,11 +139,11 @@ export function findMovingRegions(
       const bw = r.maxX - r.minX + 1;
       const bh = r.maxY - r.minY + 1;
       if (kind === "object") {
-        if (bw < 2 || bh < 2 || bw > 16 || bh > 14) continue;
-      } else if (bw < 2 || bh < 2 || bw > 16 || bh > 10) continue;
+        if (bw < 2 || bh < 2 || bw > 24 || bh > 14) continue;
+      } else if (bw < 2 || bh < 2 || bw > 28 || bh > 12) continue;
       const aspect = bw / bh;
       if (kind === "object") {
-        if (aspect < 0.32 || aspect > 3.6) continue;
+        if (aspect < 0.32 || aspect > 3.8) continue;
       } else if (aspect < 0.85 || aspect > 4.8) continue;
       const raw = {
         x: (r.minX / gw) * width,
@@ -153,11 +153,11 @@ export function findMovingRegions(
       };
       const area = raw.w * raw.h;
       if (kind === "object") {
-        if (area < frameA * 0.0025 || area > frameA * 0.16) continue;
-        if (raw.h > height * 0.5 || raw.w > width * 0.44) continue;
+        if (area < frameA * 0.0025 || area > frameA * 0.28) continue;
+        if (raw.h > height * 0.55 || raw.w > width * 0.7) continue;
       } else {
-        if (area < frameA * 0.004 || area > frameA * 0.16) continue;
-        if (raw.h > height * 0.36 || raw.w > width * 0.44) continue;
+        if (area < frameA * 0.004 || area > frameA * 0.30) continue;
+        if (raw.h > height * 0.5 || raw.w > width * 0.74) continue;
       }
       const tight = insetBox(raw, 0.08);
       if (kind === "object") {

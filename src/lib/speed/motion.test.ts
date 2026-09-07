@@ -49,6 +49,14 @@ describe("isVehicleLike", () => {
   it("accepts a mid-road car box", () => {
     assert.equal(isVehicleLike({ x: 120, y: 280, w: 110, h: 55 }, 390, 700, 18), true);
   });
+
+  it("accepts a bus filling half the frame", () => {
+    assert.equal(isVehicleLike({ x: 20, y: 250, w: 250, h: 95 }, 390, 700, 12), true);
+  });
+
+  it("rejects a sidewalk-low box", () => {
+    assert.equal(isVehicleLike({ x: 80, y: 500, w: 120, h: 50 }, 390, 700, 8), false);
+  });
 });
 
 describe("isObjectLike", () => {

@@ -4,7 +4,7 @@ import { attachStream, cameraErrorMessage, openCamera } from "./camera";
 import { fleetById } from "./catalog";
 import { requestMotionPermission } from "./gps";
 import { BoxKalman } from "./kalman";
-import { boxIou, findMovingRegions, grabPatch, isTargetLike, isVehicleLike, pickLock, pickTarget, rgbaToGray, trackPatch } from "./motion";
+import { boxIou, findMovingRegions, grabPatch, isTargetLike, isVehicleLike, pickLock, pickTarget, roadScore, rgbaToGray, trackPatch } from "./motion";
 import { assumedSpanM, lookupWheelbase } from "./wheelbase";
 import { FlowTracker, flowSpeedMps } from "./optical-flow";
 import {
@@ -323,7 +323,7 @@ export function useVeloxEngine(refs: EngineRefs) {
           }));
           for (const m of mapped) boxes.push({ id: m.id, bbox: m.bbox });
           const sized = found.filter(
-            (b) => b.w < ANALYSIS_W * 0.44 && b.h < ANALYSIS_H * (disparo ? 0.5 : 0.36),
+            (b) => b.w < ANALYSIS_W * 0.74 && b.h < ANALYSIS_H * (disparo ? 0.55 : 0.5),
           );
           const freshTap = pendingAim != null && now - pendingAim.at < 220;
           if (freshTap) {
@@ -385,11 +385,14 @@ export function useVeloxEngine(refs: EngineRefs) {
                   : isVehicleLike(altCanvas, canvasW, canvasH));
               const altCar = altCanvas != null && isVehicleLike(altCanvas, canvasW, canvasH);
               const movedCar = isVehicleLike(canvasMoved, canvasW, canvasH);
+              const altBigger = alt != null && alt.w * alt.h > moved.w * moved.h * 1.7;
+              const altRoad = alt != null && roadScore(alt, ANALYSIS_H) >= 0.4;
               const steal =
                 alt != null &&
                 altLike &&
-                boxIou(moved, alt) < 0.12 &&
-                (!like || stillFrames > 8 || (disparo && altCar && !movedCar));
+                altRoad &&
+                boxIou(moved, alt) < 0.15 &&
+                (!like || stillFrames > 6 || altBigger || (altCar && !movedCar));
               if (steal && alt) {
                 tmpl = null;
                 tmplBox = null;
