@@ -1,5 +1,5 @@
-import { memo, useMemo } from "react";
-import { gaugeMax, limitInDisplay, toDisplaySpeed } from "@/lib/speed/format";
+import { memo, useMemo, useRef } from "react";
+import { gaugeTickPlan, limitInDisplay, pickGaugeMax, toDisplaySpeed } from "@/lib/speed/format";
 import type { Units } from "@/lib/speed/types";
 
 type Props = {
@@ -36,8 +36,7 @@ const Ticks = memo(function Ticks({ max }: { max: number }) {
       major: boolean;
       label?: { x: number; y: number; text: string };
     }[] = [];
-    const step = max <= 160 ? 5 : 10;
-    const majorEvery = max <= 160 ? 20 : 20;
+    const { step, major: majorEvery } = gaugeTickPlan(max);
     for (let v = 0; v <= max; v += step) {
       const t = v / max;
       const deg = START + t * SWEEP;
@@ -80,7 +79,7 @@ const Ticks = memo(function Ticks({ max }: { max: number }) {
               textAnchor="middle"
               dominantBaseline="middle"
               className="fill-muted font-condensed"
-              fontSize="11"
+              fontSize={max >= 320 ? "10" : "11"}
               fontWeight="600"
             >
               {t.label.text}
@@ -93,14 +92,17 @@ const Ticks = memo(function Ticks({ max }: { max: number }) {
 });
 
 export function AnalogGauge({ speedMps, units, limitKmh }: Props) {
-  const max = gaugeMax(units);
-  const display = Math.min(max, Math.max(0, toDisplaySpeed(speedMps, units)));
+  const raw = Math.max(0, toDisplaySpeed(speedMps, units));
+  const held = useRef(pickGaugeMax(raw, units));
+  held.current = pickGaugeMax(raw, units, held.current);
+  const max = held.current;
+  const display = Math.min(max, raw);
   const angle = START + (display / max) * SWEEP;
   const needle = polar(CX, CY, R - 22, angle);
   const hub = polar(CX, CY, 0, 0);
   const limit = Math.min(max, limitInDisplay(limitKmh, units));
   const limitDeg = START + (limit / max) * SWEEP;
-  const redStart = START + (0.82 * SWEEP);
+  const redStart = START + 0.82 * SWEEP;
   const over = display >= limit - 0.01 && limit > 0;
 
   return (
@@ -108,7 +110,7 @@ export function AnalogGauge({ speedMps, units, limitKmh }: Props) {
       viewBox="0 0 400 230"
       className="mx-auto h-auto w-full max-h-44 max-w-md min-[700px]:max-h-64"
       role="img"
-      aria-label={`Velocímetro ${Math.round(display)}`}
+      aria-label={`Velocímetro ${Math.round(raw)} de ${max}`}
     >
       <path
         d={arcPath(CX, CY, R, START, START + SWEEP)}
@@ -150,6 +152,17 @@ export function AnalogGauge({ speedMps, units, limitKmh }: Props) {
       />
       <circle cx={CX} cy={CY} r="7" className="fill-fg" />
       <circle cx={CX} cy={CY} r="3.2" className="fill-bg" />
+      <text
+        x={CX}
+        y={222}
+        textAnchor="middle"
+        className="fill-faint font-condensed"
+        fontSize="11"
+        fontWeight="600"
+        letterSpacing="0.12em"
+      >
+        0–{max}
+      </text>
     </svg>
   );
 }

@@ -80,7 +80,8 @@ export function SettingsDrawer() {
               Ajustes
             </Drawer.Title>
             <Drawer.Description className="mt-1 text-sm text-muted">
-              Calibra el blanco y el límite de alerta.
+              El teléfono quieto mide mejor la velocidad del auto que se mueve. El dial
+              abre hasta 500 km/h si el blanco lo pide.
             </Drawer.Description>
 
             <div className="mt-6 space-y-6">
@@ -140,7 +141,7 @@ export function SettingsDrawer() {
               >
                 <Slider
                   min={20}
-                  max={160}
+                  max={400}
                   step={5}
                   value={[settings.speedLimitKmh]}
                   onValueChange={(v) => setSettings({ speedLimitKmh: v[0] ?? 120 })}

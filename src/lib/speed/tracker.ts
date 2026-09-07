@@ -37,7 +37,7 @@ export class RangeTracker {
     const dx = b.x - a.x;
     const dz = b.z - a.z;
     const raw = Math.hypot(dx, dz) / dt;
-    const v = Math.min(70, raw * sensitivity);
+    const v = Math.min(155, raw * sensitivity);
     this.speedMps = this.speedMps * 0.55 + v * 0.45;
     this.confidence = Math.min(1, this.samples.length / 12);
   }

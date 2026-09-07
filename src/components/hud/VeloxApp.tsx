@@ -216,8 +216,8 @@ export function VeloxApp() {
           {channel === "demo"
             ? "Demo de calle: el retículo bloquea un auto, lee su velocidad y arma la ficha. Activa la cámara para medir de verdad."
             : lock
-              ? "Mantén el auto en el centro: se identifica solo (cualquier marca) y entra al catálogo."
-              : "Apunta la cámara a cualquier auto en movimiento y espera el bloqueo."}
+              ? "Quédate quieto y mantén el auto en el centro: así se lee SU velocidad (no la tuya) y se arma la ficha."
+              : "Apunta a cualquier auto. El teléfono quieto da la mejor medición."}
         </p>
 
         {cameraError ? (

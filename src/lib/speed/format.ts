@@ -18,6 +18,29 @@ export function gaugeMax(units: Units): number {
   return units === "mph" ? 160 : 240;
 }
 
+export const GAUGE_TIERS_KMH = [180, 240, 320, 400, 500] as const;
+export const GAUGE_TIERS_MPH = [120, 160, 200, 250, 310] as const;
+
+export function pickGaugeMax(display: number, units: Units, held?: number): number {
+  const tiers = units === "mph" ? GAUGE_TIERS_MPH : GAUGE_TIERS_KMH;
+  const needed = Math.max(0, display) / 0.84;
+  let pick: number = tiers[0]!;
+  for (const t of tiers) {
+    pick = t;
+    if (t >= needed) break;
+  }
+  if (held && held > pick && display > held * 0.52) return held;
+  return pick;
+}
+
+export function gaugeTickPlan(max: number): { step: number; major: number } {
+  if (max >= 400) return { step: 25, major: 100 };
+  if (max >= 320) return { step: 20, major: 40 };
+  if (max >= 240) return { step: 10, major: 40 };
+  if (max >= 180) return { step: 10, major: 20 };
+  return { step: 5, major: 20 };
+}
+
 export function formatSpeed(mps: number, units: Units): string {
   const v = Math.max(0, toDisplaySpeed(mps, units));
   return numCL({ maximumFractionDigits: 0 }).format(Math.round(v));
