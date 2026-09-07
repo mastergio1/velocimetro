@@ -1,6 +1,6 @@
 import { beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { COLLECTION_KEY, MEMORY_KEY } from "./types.ts";
+import { COLLECTION_KEY, MEMORY_KEY, WILD_KEY } from "./types.ts";
 import { useVelox } from "./store.ts";
 
 const bag = new Map<string, string>();
@@ -51,6 +51,12 @@ describe("hydrate", () => {
 
   it("drops oversized blobs", () => {
     bag.set(COLLECTION_KEY, "x".repeat(800_000));
+    useVelox.getState().hydrate();
+    assert.equal(useVelox.getState().collection.length, 0);
+  });
+
+  it("drops oversized wilds blobs", () => {
+    bag.set(WILD_KEY, "x".repeat(800_000));
     useVelox.getState().hydrate();
     assert.equal(useVelox.getState().collection.length, 0);
   });

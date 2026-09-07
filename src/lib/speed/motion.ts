@@ -26,10 +26,11 @@ export function roadScore(b: BBox, frameH: number): number {
 export function isVehicleLike(b: BBox, frameW: number, frameH: number, distM?: number): boolean {
   const aspect = b.w / Math.max(1, b.h);
   if (aspect < 0.85 || aspect > 4.6) return false;
-  if (b.h > frameH * 0.55) return false;
+  if (b.h > frameH * 0.4) return false;
+  if (b.w > frameW * 0.46) return false;
   const cy = b.y + b.h / 2;
-  if (cy < frameH * 0.12 || cy > frameH * 0.9) return false;
-  if (distM != null && distM < 1.8) return false;
+  if (cy < frameH * 0.18 || cy > frameH * 0.78) return false;
+  if (distM != null && distM < 3.2) return false;
   return true;
 }
 
@@ -102,7 +103,7 @@ export function findMovingRegions(
       const r = flood(x, y);
       const bw = r.maxX - r.minX + 1;
       const bh = r.maxY - r.minY + 1;
-      if (bw < 2 || bh < 2) continue;
+      if (bw < 2 || bh < 2 || bw > 16 || bh > 10) continue;
       const aspect = bw / bh;
       if (aspect < 0.85 || aspect > 4.8) continue;
       const raw = {
@@ -112,8 +113,8 @@ export function findMovingRegions(
         h: (bh / gh) * height,
       };
       const area = raw.w * raw.h;
-      if (area < frameA * 0.004 || area > frameA * 0.5) continue;
-      if (raw.h > height * 0.58) continue;
+      if (area < frameA * 0.004 || area > frameA * 0.16) continue;
+      if (raw.h > height * 0.36 || raw.w > width * 0.44) continue;
       const tight = insetBox(raw, 0.08);
       const aspectN =
         tight.w / Math.max(1, tight.h) >= 1.15 && tight.w / Math.max(1, tight.h) <= 3.8
@@ -189,4 +190,65 @@ function iou(a: BBox, b: BBox) {
   const inter = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
   const union = a.w * a.h + b.w * b.h - inter;
   return union <= 0 ? 0 : inter / union;
+}
+
+export function grabPatch(
+  frame: Uint8Array,
+  width: number,
+  height: number,
+  box: BBox,
+): { data: Uint8Array; tw: number; th: number; box: BBox } {
+  const tw = Math.max(16, Math.min(64, Math.round(box.w)));
+  const th = Math.max(10, Math.min(36, Math.round(box.h)));
+  const x0 = Math.round(box.x + (box.w - tw) / 2);
+  const y0 = Math.round(box.y + (box.h - th) / 2);
+  const data = new Uint8Array(tw * th);
+  for (let y = 0; y < th; y++) {
+    const fy = Math.min(height - 1, Math.max(0, y0 + y));
+    const row = fy * width;
+    const tr = y * tw;
+    for (let x = 0; x < tw; x++) {
+      const fx = Math.min(width - 1, Math.max(0, x0 + x));
+      data[tr + x] = frame[row + fx] ?? 0;
+    }
+  }
+  return { data, tw, th, box: { x: x0, y: y0, w: tw, h: th } };
+}
+
+/** Follow a gray patch by SAD. Same-size box, shifted. */
+export function trackPatch(
+  frame: Uint8Array,
+  tmpl: Uint8Array,
+  tw: number,
+  th: number,
+  width: number,
+  height: number,
+  guess: BBox,
+  search = 14,
+): BBox | null {
+  const gx = Math.round(guess.x);
+  const gy = Math.round(guess.y);
+  let best = 1e15;
+  let bx = gx;
+  let by = gy;
+  for (let dy = -search; dy <= search; dy++) {
+    for (let dx = -search; dx <= search; dx++) {
+      const x0 = gx + dx;
+      const y0 = gy + dy;
+      if (x0 < 0 || y0 < 0 || x0 + tw > width || y0 + th > height) continue;
+      let s = 0;
+      for (let y = 0; y < th; y++) {
+        const fr = (y0 + y) * width + x0;
+        const tr = y * tw;
+        for (let x = 0; x < tw; x++) s += Math.abs((frame[fr + x] ?? 0) - (tmpl[tr + x] ?? 0));
+      }
+      if (s < best) {
+        best = s;
+        bx = x0;
+        by = y0;
+      }
+    }
+  }
+  if (best / (tw * th) > 48) return null;
+  return { x: bx, y: by, w: guess.w, h: guess.h };
 }

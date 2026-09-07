@@ -4,7 +4,7 @@ import { attachStream, cameraErrorMessage, openCamera } from "./camera";
 import { fleetById } from "./catalog";
 import { requestMotionPermission } from "./gps";
 import { BoxKalman } from "./kalman";
-import { findMovingRegions, isVehicleLike, pickLock, rgbaToGray } from "./motion";
+import { findMovingRegions, grabPatch, isVehicleLike, pickLock, rgbaToGray, trackPatch } from "./motion";
 import { assumedSpanM, lookupWheelbase } from "./wheelbase";
 import { FlowTracker, flowSpeedMps } from "./optical-flow";
 import {
@@ -198,6 +198,11 @@ export function useVeloxEngine(refs: EngineRefs) {
     let raf = 0;
     let last = performance.now();
     let lastHistory = 0;
+    let tmpl: Uint8Array | null = null;
+    let tmplW = 0;
+    let tmplH = 0;
+    let tmplBox: BBox | null = null;
+    let tmplAge = 0;
 
     const analysis = refsRef.current.analysisRef.current;
     if (analysis) {
@@ -289,9 +294,10 @@ export function useVeloxEngine(refs: EngineRefs) {
             raw: b,
           }));
           for (const m of mapped) boxes.push({ id: m.id, bbox: m.bbox });
-          const aim = pendingAim && now - pendingAim.at < 3200 ? pendingAim : null;
+          const aim = pendingAim && now - pendingAim.at < 4000 ? pendingAim : null;
+          const freshTap = pendingAim != null && now - pendingAim.at < 220;
           let chosen = pickLock(
-            found,
+            found.filter((b) => b.w < ANALYSIS_W * 0.44 && b.h < ANALYSIS_H * 0.36),
             ANALYSIS_W,
             ANALYSIS_H,
             lastLockId,
@@ -305,21 +311,34 @@ export function useVeloxEngine(refs: EngineRefs) {
               : null,
             null,
           );
-          if (aim) {
-            const ax = aim.nx * ANALYSIS_W;
-            const ay = aim.ny * ANALYSIS_H;
-            const hit = found.find(
-              (b) => ax >= b.x && ax <= b.x + b.w && ay >= b.y && ay <= b.y + b.h,
-            );
+          if (freshTap && pendingAim) {
+            tmpl = null;
+            tmplBox = null;
+            const ax = pendingAim.nx * ANALYSIS_W;
+            const ay = pendingAim.ny * ANALYSIS_H;
+            const near = found
+              .filter((b) => b.w < ANALYSIS_W * 0.44 && b.h < ANALYSIS_H * 0.36)
+              .map((b) => {
+                const dx = b.x + b.w / 2 - ax;
+                const dy = b.y + b.h / 2 - ay;
+                return { b, d: dx * dx + dy * dy };
+              })
+              .sort((a, c) => a.d - c.d);
+            const hit = near[0] && near[0].d < (ANALYSIS_W * 0.22) ** 2 ? near[0].b : null;
             chosen =
-              hit ??
-              ({
-                x: Math.max(0, ax - ANALYSIS_W * 0.16),
-                y: Math.max(0, ay - ANALYSIS_H * 0.08),
-                w: ANALYSIS_W * 0.32,
-                h: ANALYSIS_H * 0.16,
+              hit ?? {
+                x: Math.max(0, ax - ANALYSIS_W * 0.1),
+                y: Math.max(0, ay - ANALYSIS_H * 0.05),
+                w: ANALYSIS_W * 0.2,
+                h: ANALYSIS_H * 0.1,
                 score: 1e6,
-              } as typeof found[number]);
+              };
+          } else if (tmpl && tmplBox) {
+            const moved = trackPatch(gray, tmpl, tmplW, tmplH, ANALYSIS_W, ANALYSIS_H, tmplBox);
+            if (moved) {
+              chosen = { ...moved, score: chosen?.score ?? 500 };
+              tmplBox = moved;
+            }
           }
           const bbox = chosen
             ? {
@@ -358,7 +377,7 @@ export function useVeloxEngine(refs: EngineRefs) {
               fr.vectors,
               chosen,
               ANALYSIS_W,
-              distGuess,
+              Math.max(distGuess, 4),
               dt,
               HFOV,
             );
@@ -371,6 +390,23 @@ export function useVeloxEngine(refs: EngineRefs) {
               flowV.speedMps,
               flowV.confidence,
             );
+            if (!tmpl || aim) {
+              const p = grabPatch(gray, ANALYSIS_W, ANALYSIS_H, chosen);
+              tmpl = p.data;
+              tmplW = p.tw;
+              tmplH = p.th;
+              tmplBox = p.box;
+              tmplAge = 0;
+            } else {
+              tmplAge++;
+              if (tmplAge % 8 === 0) {
+                const p = grabPatch(gray, ANALYSIS_W, ANALYSIS_H, chosen);
+                tmpl = p.data;
+                tmplW = p.tw;
+                tmplH = p.th;
+                tmplBox = p.box;
+              }
+            }
             lock = {
               id: "live",
               bbox: filtered,
@@ -381,7 +417,7 @@ export function useVeloxEngine(refs: EngineRefs) {
             };
             held = lock;
             holdUntil = now + 420;
-          } else if (kf.inited && kf.misses < 12) {
+          } else if (kf.inited && kf.misses < 18) {
             kf.predict(dt);
             lock = {
               id: "live",
@@ -404,6 +440,8 @@ export function useVeloxEngine(refs: EngineRefs) {
         flow.reset();
         kf.reset();
         range.reset();
+        tmpl = null;
+        tmplBox = null;
       }
 
       lastLockId = lock?.id ?? null;

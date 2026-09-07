@@ -82,9 +82,12 @@ function loadUnlocks(): string[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(DEX_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as string[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!raw || raw.length > 20_000) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((id): id is string => typeof id === "string" && id.length > 0 && id.length < 80)
+      .slice(0, 400);
   } catch {
     return [];
   }
@@ -94,9 +97,10 @@ function loadWilds(): WildEntry[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(WILD_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as WildEntry[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!raw || raw.length > 750_000) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(0, COLLECTION_MAX) as WildEntry[];
   } catch {
     return [];
   }

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { pickLock, isVehicleLike, findMovingRegions, type MotionBox } from "./motion.ts";
+import { pickLock, isVehicleLike, findMovingRegions, grabPatch, trackPatch, type MotionBox } from "./motion.ts";
 
 function box(x: number, y: number, w = 40, h = 24, score = 1): MotionBox {
   return { x, y, w, h, score };
@@ -39,7 +39,11 @@ describe("isVehicleLike", () => {
   });
 
   it("accepts a close van crossing the intersection", () => {
-    assert.equal(isVehicleLike({ x: 40, y: 240, w: 220, h: 70 }, 390, 700, 5.2), true);
+    assert.equal(isVehicleLike({ x: 40, y: 240, w: 160, h: 70 }, 390, 700, 5.2), true);
+  });
+
+  it("rejects a mural-sized box that would read 2 m", () => {
+    assert.equal(isVehicleLike({ x: 20, y: 120, w: 240, h: 180 }, 390, 700, 2), false);
   });
 
   it("accepts a mid-road car box", () => {
@@ -64,5 +68,23 @@ describe("findMovingRegions", () => {
     assert.ok(boxes.length >= 1, "expected a motion blob");
     const cy = boxes[0]!.y + boxes[0]!.h / 2;
     assert.ok(cy > h * 0.28 && cy < h * 0.65, `cy ${cy}`);
+  });
+});
+
+describe("trackPatch", () => {
+  it("follows a shifted rectangle", () => {
+    const w = 80;
+    const h = 50;
+    const frame = new Uint8Array(w * h).fill(20);
+    for (let y = 18; y < 30; y++) for (let x = 22; x < 50; x++) frame[y * w + x] = 200;
+    const grabbed = grabPatch(frame, w, h, { x: 22, y: 18, w: 28, h: 12 });
+    const shifted = new Uint8Array(frame);
+    for (let y = 18; y < 30; y++) {
+      for (let x = 22; x < 50; x++) shifted[y * w + x] = 20;
+      for (let x = 28; x < 56; x++) shifted[y * w + x] = 200;
+    }
+    const moved = trackPatch(shifted, grabbed.data, grabbed.tw, grabbed.th, w, h, grabbed.box, 10);
+    assert.ok(moved);
+    assert.ok(moved!.x > grabbed.box.x + 2, `x ${moved!.x} vs ${grabbed.box.x}`);
   });
 });
