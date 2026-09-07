@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { pickLock, pickObject, isVehicleLike, isObjectLike, findMovingRegions, grabPatch, trackPatch, type MotionBox } from "./motion.ts";
+import { pickLock, pickObject, pickTarget, isVehicleLike, isObjectLike, findMovingRegions, grabPatch, trackPatch, type MotionBox } from "./motion.ts";
 
 function box(x: number, y: number, w = 40, h = 24, score = 1): MotionBox {
   return { x, y, w, h, score };
@@ -71,6 +71,15 @@ describe("pickObject", () => {
     const skater = box(90, 40, 18, 40, 40);
     const picked = pickObject([ground, skater], 200, 120, null);
     assert.equal(picked, skater);
+  });
+});
+
+describe("pickTarget", () => {
+  it("picks a car over a tree in disparo", () => {
+    const tree = box(20, 8, 16, 50, 80);
+    const car = box(80, 46, 52, 22, 50);
+    const picked = pickTarget([tree, car], 200, 120, null);
+    assert.equal(picked, car);
   });
 });
 

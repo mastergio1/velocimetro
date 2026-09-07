@@ -4,7 +4,7 @@ import { attachStream, cameraErrorMessage, openCamera } from "./camera";
 import { fleetById } from "./catalog";
 import { requestMotionPermission } from "./gps";
 import { BoxKalman } from "./kalman";
-import { boxIou, findMovingRegions, grabPatch, isObjectLike, isVehicleLike, pickLock, pickObject, rgbaToGray, trackPatch } from "./motion";
+import { boxIou, findMovingRegions, grabPatch, isTargetLike, isVehicleLike, pickLock, pickTarget, rgbaToGray, trackPatch } from "./motion";
 import { assumedSpanM, lookupWheelbase } from "./wheelbase";
 import { FlowTracker, flowSpeedMps } from "./optical-flow";
 import {
@@ -357,7 +357,7 @@ export function useVeloxEngine(refs: EngineRefs) {
           } else if (tmpl && tmplBox) {
             const moved = trackPatch(gray, tmpl, tmplW, tmplH, ANALYSIS_W, ANALYSIS_H, tmplBox);
             const alt = disparo
-              ? pickObject(sized, ANALYSIS_W, ANALYSIS_H, moved)
+              ? pickTarget(sized, ANALYSIS_W, ANALYSIS_H, moved)
               : pickLock(sized, ANALYSIS_W, ANALYSIS_H, null, moved, null);
             if (moved) {
               const tcx = moved.x + moved.w / 2;
@@ -373,30 +373,23 @@ export function useVeloxEngine(refs: EngineRefs) {
                 h: moved.h * sy,
               };
               const like = disparo
-                ? isObjectLike(canvasMoved, canvasW, canvasH)
+                ? isTargetLike(canvasMoved, canvasW, canvasH)
                 : isVehicleLike(canvasMoved, canvasW, canvasH);
+              const altCanvas = alt
+                ? { x: alt.x * sx, y: alt.y * sy, w: alt.w * sx, h: alt.h * sy }
+                : null;
               const altLike =
-                alt != null &&
+                altCanvas != null &&
                 (disparo
-                  ? isObjectLike(
-                      { x: alt.x * sx, y: alt.y * sy, w: alt.w * sx, h: alt.h * sy },
-                      canvasW,
-                      canvasH,
-                    )
-                  : isVehicleLike(
-                      { x: alt.x * sx, y: alt.y * sy, w: alt.w * sx, h: alt.h * sy },
-                      canvasW,
-                      canvasH,
-                    ));
-              const movedAspect = moved.w / Math.max(1, moved.h);
-              const altAspect = alt ? alt.w / Math.max(1, alt.h) : 99;
+                  ? isTargetLike(altCanvas, canvasW, canvasH)
+                  : isVehicleLike(altCanvas, canvasW, canvasH));
+              const altCar = altCanvas != null && isVehicleLike(altCanvas, canvasW, canvasH);
+              const movedCar = isVehicleLike(canvasMoved, canvasW, canvasH);
               const steal =
                 alt != null &&
                 altLike &&
                 boxIou(moved, alt) < 0.12 &&
-                (!like ||
-                  stillFrames > 8 ||
-                  (disparo && altAspect <= 1.2 && movedAspect > 1.6));
+                (!like || stillFrames > 8 || (disparo && altCar && !movedCar));
               if (steal && alt) {
                 tmpl = null;
                 tmplBox = null;
@@ -441,7 +434,7 @@ export function useVeloxEngine(refs: EngineRefs) {
             chosen = null;
           } else {
             chosen = disparo
-              ? pickObject(
+              ? pickTarget(
                   sized,
                   ANALYSIS_W,
                   ANALYSIS_H,
@@ -475,7 +468,9 @@ export function useVeloxEngine(refs: EngineRefs) {
               }
             : null;
           const f = canvasW / 2 / Math.tan(HFOV / 2);
-          const spanM = disparo ? 0.55 : settings.assumedWidthM;
+          const aspect0 = bbox ? bbox.w / Math.max(1, bbox.h) : 1;
+          const spanM =
+            disparo && aspect0 < 1.2 ? 0.55 : settings.assumedWidthM;
           const distGuess = bbox
             ? (spanM * f) / Math.max(8, bbox.w)
             : 0;
@@ -483,7 +478,9 @@ export function useVeloxEngine(refs: EngineRefs) {
             bbox &&
             (freshTap ||
               tmpl != null ||
-              (disparo ? isObjectLike(bbox, canvasW, canvasH) : isVehicleLike(bbox, canvasW, canvasH, distGuess)))
+              (disparo
+                ? isTargetLike(bbox, canvasW, canvasH)
+                : isVehicleLike(bbox, canvasW, canvasH, distGuess)))
               ? bbox
               : null;
 
@@ -495,9 +492,21 @@ export function useVeloxEngine(refs: EngineRefs) {
             const wb =
               ident?.wheelbaseM ??
               (ident ? lookupWheelbase(ident.make, ident.model, ident.klass) : null);
-            const span = disparo
-              ? 0.55
-              : assumedSpanM(filtered, settings.assumedWidthM, wb);
+            const span =
+              disparo && filtered.w / Math.max(1, filtered.h) < 1.2
+                ? 0.55
+                : assumedSpanM(filtered, settings.assumedWidthM, wb);
+            const jumped =
+              lastBox != null &&
+              Math.hypot(
+                filtered.x + filtered.w / 2 - (lastBox.x + lastBox.w / 2),
+                filtered.y + filtered.h / 2 - (lastBox.y + lastBox.h / 2),
+              ) >
+                canvasW * 0.22;
+            if (jumped) {
+              range.reset();
+              passSamples = [];
+            }
             const flowV = flowSpeedMps(
               fr.vectors,
               chosen,
@@ -506,15 +515,17 @@ export function useVeloxEngine(refs: EngineRefs) {
               dt,
               HFOV,
             );
-            range.push(
-              filtered,
-              canvasW,
-              span,
-              settings.sensitivity,
-              now,
-              flowV.speedMps,
-              flowV.confidence,
-            );
+            if (!jumped) {
+              range.push(
+                filtered,
+                canvasW,
+                span,
+                settings.sensitivity,
+                now,
+                flowV.speedMps,
+                flowV.confidence,
+              );
+            }
             if (!tmpl) {
               const p = grabPatch(gray, ANALYSIS_W, ANALYSIS_H, chosen);
               tmpl = p.data;
@@ -575,8 +586,11 @@ export function useVeloxEngine(refs: EngineRefs) {
       lastDist = lock?.distanceM ?? lastDist;
 
       if (lock && range.speedMps > 0.35) {
-        passSamples.push(range.speedMps);
-        if (passSamples.length > 48) passSamples.shift();
+        const prevS = passSamples[passSamples.length - 1] ?? range.speedMps;
+        if (range.speedMps < prevS * 2.4 + 6) {
+          passSamples.push(range.speedMps);
+          if (passSamples.length > 48) passSamples.shift();
+        }
         shot = null;
       } else if (lost) {
         const sum = summarizePass(passSamples);
@@ -592,7 +606,8 @@ export function useVeloxEngine(refs: EngineRefs) {
       if (showingShot && shot) {
         displayMps = shot.peakMps;
       } else {
-        const target = lock?.speedMps ?? 0;
+        let target = lock?.speedMps ?? 0;
+        if (displayMps > 1 && target > displayMps * 2.8 + 8) target = displayMps;
         displayMps = displayMps * 0.55 + target * 0.45;
         if (!lock) displayMps *= 0.9;
         if (displayMps < 0.2) displayMps = 0;

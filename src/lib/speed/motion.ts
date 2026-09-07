@@ -37,23 +37,32 @@ export function isVehicleLike(b: BBox, frameW: number, frameH: number, distM?: n
 export function isObjectLike(b: BBox, frameW: number, frameH: number): boolean {
   const area = (b.w * b.h) / Math.max(1, frameW * frameH);
   if (area < 0.002 || area > 0.28) return false;
-  if (b.w > frameW * 0.38 || b.h > frameH * 0.58) return false;
+  if (b.w > frameW * 0.46 || b.h > frameH * 0.58) return false;
   const aspect = b.w / Math.max(1, b.h);
-  if (aspect < 0.22 || aspect > 2.1) return false;
+  if (aspect < 0.22 || aspect > 3.4) return false;
   const cy = b.y + b.h / 2;
-  if (cy < frameH * 0.12 || cy > frameH * 0.8) return false;
+  if (cy < frameH * 0.16 || cy > frameH * 0.78) return false;
   return true;
+}
+
+export function isTargetLike(
+  b: BBox,
+  frameW: number,
+  frameH: number,
+  distM?: number,
+): boolean {
+  return isVehicleLike(b, frameW, frameH, distM) || isObjectLike(b, frameW, frameH);
 }
 
 function objectScore(b: BBox, frameH: number): number {
   const cy = (b.y + b.h / 2) / frameH;
   const aspect = b.w / Math.max(1, b.h);
-  let s = 1;
-  if (cy < 0.16 || cy > 0.76) s *= 0.12;
-  else if (cy >= 0.26 && cy <= 0.64) s *= 1;
-  else s *= 0.4;
-  if (aspect >= 0.32 && aspect <= 1.2) s *= 1.5;
-  if (aspect > 1.7) s *= 0.25;
+  let s = roadScore(b, frameH);
+  if (aspect >= 1.1 && aspect <= 3.6) s *= 1.25;
+  else if (aspect >= 0.32 && aspect <= 1.15) s *= 0.95;
+  else s *= 0.2;
+  if (cy < 0.22) s *= 0.08;
+  if (cy > 0.72) s *= 0.15;
   return s;
 }
 
@@ -130,11 +139,11 @@ export function findMovingRegions(
       const bw = r.maxX - r.minX + 1;
       const bh = r.maxY - r.minY + 1;
       if (kind === "object") {
-        if (bw < 2 || bh < 2 || bw > 12 || bh > 16) continue;
+        if (bw < 2 || bh < 2 || bw > 16 || bh > 14) continue;
       } else if (bw < 2 || bh < 2 || bw > 16 || bh > 10) continue;
       const aspect = bw / bh;
       if (kind === "object") {
-        if (aspect < 0.28 || aspect > 2.2) continue;
+        if (aspect < 0.32 || aspect > 3.6) continue;
       } else if (aspect < 0.85 || aspect > 4.8) continue;
       const raw = {
         x: (r.minX / gw) * width,
@@ -144,8 +153,8 @@ export function findMovingRegions(
       };
       const area = raw.w * raw.h;
       if (kind === "object") {
-        if (area < frameA * 0.002 || area > frameA * 0.14) continue;
-        if (raw.h > height * 0.55 || raw.w > width * 0.36) continue;
+        if (area < frameA * 0.0025 || area > frameA * 0.16) continue;
+        if (raw.h > height * 0.5 || raw.w > width * 0.44) continue;
       } else {
         if (area < frameA * 0.004 || area > frameA * 0.16) continue;
         if (raw.h > height * 0.36 || raw.w > width * 0.44) continue;
@@ -251,6 +260,19 @@ export function pickObject(
     }
   }
   return best;
+}
+
+/** Disparo: lock a car if one is in play, otherwise a person/object. */
+export function pickTarget(
+  boxes: MotionBox[],
+  frameW: number,
+  frameH: number,
+  prevBox: BBox | null,
+  aim?: { x: number; y: number } | null,
+): MotionBox | null {
+  const cars = boxes.filter((b) => isVehicleLike(b, frameW, frameH));
+  if (cars.length) return pickLock(cars, frameW, frameH, null, prevBox, null);
+  return pickObject(boxes, frameW, frameH, prevBox, aim);
 }
 
 function dist2(b: BBox, cx: number, cy: number) {
