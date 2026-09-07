@@ -1,18 +1,21 @@
 import { create } from "zustand";
 import {
   CATALOG,
-  inferGamma,
-  matchCatalog,
+  catalogById,
+  entryKey,
+  toCollectionEntry,
   wildId,
+  type CollectionEntry,
   type WildEntry,
 } from "./catalog";
 import {
+  COLLECTION_KEY,
+  COLLECTION_MAX,
   DEFAULT_SETTINGS,
   DEX_KEY,
   MEMORY_KEY,
   MEMORY_MAX,
   WILD_KEY,
-  WILD_MAX,
   type LiveState,
   type MemoryEntry,
   type Settings,
@@ -43,15 +46,25 @@ function loadMemory(): MemoryEntry[] {
   }
 }
 
+function loadCollection(): CollectionEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(COLLECTION_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as CollectionEntry[];
+    return Array.isArray(parsed) ? parsed.slice(0, COLLECTION_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+
 function loadUnlocks(): string[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(DEX_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as string[];
-    if (!Array.isArray(parsed)) return [];
-    const known = new Set(CATALOG.map((c) => c.id));
-    return parsed.filter((id) => known.has(id));
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
@@ -63,16 +76,15 @@ function loadWilds(): WildEntry[] {
     const raw = window.localStorage.getItem(WILD_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as WildEntry[];
-    return Array.isArray(parsed) ? parsed.slice(0, WILD_MAX) : [];
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 }
 
-function persistDex(unlocks: string[], wilds: WildEntry[]) {
+function persistCollection(collection: CollectionEntry[]) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(DEX_KEY, JSON.stringify(unlocks));
-  window.localStorage.setItem(WILD_KEY, JSON.stringify(wilds));
+  window.localStorage.setItem(COLLECTION_KEY, JSON.stringify(collection));
 }
 
 function asVehicle(id: VehicleId): VehicleId {
@@ -83,7 +95,51 @@ function asVehicle(id: VehicleId): VehicleId {
     color: id.color,
     description: id.description,
     funFact: id.funFact,
+    klass: id.klass,
   };
+}
+
+function upsertCollection(
+  collection: CollectionEntry[],
+  vehicle: VehicleId,
+  speedKmh: number,
+): { collection: CollectionEntry[]; lastUnlockId: string } {
+  const key = entryKey(vehicle.make, vehicle.model);
+  const idx = collection.findIndex(
+    (e) => e.id === wildId(vehicle.make, vehicle.model) || entryKey(e.make, e.model) === key,
+  );
+  const prev = idx >= 0 ? collection[idx] : undefined;
+  const next = toCollectionEntry(vehicle, speedKmh, prev);
+  const rest = collection.filter((_, i) => i !== idx);
+  return {
+    collection: [next, ...rest].slice(0, COLLECTION_MAX),
+    lastUnlockId: next.id,
+  };
+}
+
+function migrateCollection(memory: MemoryEntry[]): CollectionEntry[] {
+  const existing = loadCollection();
+  if (existing.length > 0) {
+    let cur = existing;
+    for (const m of memory) {
+      cur = upsertCollection(cur, m, m.speedKmh).collection;
+    }
+    return cur;
+  }
+
+  let cur: CollectionEntry[] = [];
+  for (const id of loadUnlocks()) {
+    const car = catalogById(id) ?? CATALOG.find((c) => c.id === id);
+    if (!car) continue;
+    cur = upsertCollection(cur, car, 0).collection;
+  }
+  for (const w of loadWilds()) {
+    cur = upsertCollection(cur, w, 0).collection;
+  }
+  for (const m of memory) {
+    cur = upsertCollection(cur, m, m.speedKmh).collection;
+  }
+  return cur;
 }
 
 const initialLive: LiveState = {
@@ -107,8 +163,7 @@ const initialLive: LiveState = {
 type VeloxStore = LiveState & {
   settings: Settings;
   hydrated: boolean;
-  unlocks: string[];
-  wilds: WildEntry[];
+  collection: CollectionEntry[];
   lastUnlockId: string | null;
   setSettings: (patch: Partial<Settings>) => void;
   hydrate: () => void;
@@ -117,62 +172,21 @@ type VeloxStore = LiveState & {
   resetCatalog: () => void;
 };
 
-function applyUnlock(
-  vehicle: VehicleId,
-  unlocks: string[],
-  wilds: WildEntry[],
-): { unlocks: string[]; wilds: WildEntry[]; lastUnlockId: string } {
-  const hit = matchCatalog(vehicle.make, vehicle.model);
-  if (hit) {
-    if (unlocks.includes(hit.id)) {
-      return { unlocks, wilds, lastUnlockId: hit.id };
-    }
-    return { unlocks: [hit.id, ...unlocks], wilds, lastUnlockId: hit.id };
-  }
-
-  const id = wildId(vehicle.make, vehicle.model);
-  const entry: WildEntry = {
-    id,
-    make: vehicle.make,
-    model: vehicle.model,
-    year: vehicle.year,
-    color: vehicle.color,
-    description: vehicle.description,
-    funFact: vehicle.funFact,
-    gamma: inferGamma(vehicle.make, vehicle.model),
-    at: Date.now(),
-  };
-  const rest = wilds.filter((w) => w.id !== id);
-  return {
-    unlocks,
-    wilds: [entry, ...rest].slice(0, WILD_MAX),
-    lastUnlockId: id,
-  };
-}
-
 export const useVelox = create<VeloxStore>((set, get) => ({
   ...initialLive,
   settings: { ...DEFAULT_SETTINGS },
   hydrated: false,
-  unlocks: [],
-  wilds: [],
+  collection: [],
   lastUnlockId: null,
   hydrate: () => {
     if (get().hydrated) return;
     const memory = loadMemory();
-    let unlocks = loadUnlocks();
-    let wilds = loadWilds();
-    for (const m of memory) {
-      const next = applyUnlock(m, unlocks, wilds);
-      unlocks = next.unlocks;
-      wilds = next.wilds;
-    }
-    persistDex(unlocks, wilds);
+    const collection = migrateCollection(memory);
+    persistCollection(collection);
     set({
       settings: loadSettings(),
       memory,
-      unlocks,
-      wilds,
+      collection,
       hydrated: true,
     });
   },
@@ -196,16 +210,15 @@ export const useVelox = create<VeloxStore>((set, get) => ({
       (m) => `${m.make}|${m.model}`.toLowerCase() !== key,
     );
     const memory = [entry, ...rest].slice(0, MEMORY_MAX);
-    const dex = applyUnlock(vehicle, get().unlocks, get().wilds);
-    persistDex(dex.unlocks, dex.wilds);
+    const dex = upsertCollection(get().collection, vehicle, entry.speedKmh);
+    persistCollection(dex.collection);
     set({
       memory,
       identification: vehicle,
       identifiedLockId: lockId ?? get().lock?.id ?? null,
       identifyStatus: "idle",
       identifyError: null,
-      unlocks: dex.unlocks,
-      wilds: dex.wilds,
+      collection: dex.collection,
       lastUnlockId: dex.lastUnlockId,
     });
     if (typeof window !== "undefined") {
@@ -217,7 +230,8 @@ export const useVelox = create<VeloxStore>((set, get) => ({
     if (typeof window !== "undefined") window.localStorage.removeItem(MEMORY_KEY);
   },
   resetCatalog: () => {
-    set({ unlocks: [], wilds: [], lastUnlockId: null });
-    persistDex([], []);
+    set({ collection: [], lastUnlockId: null });
+    persistCollection([]);
   },
 }));
+

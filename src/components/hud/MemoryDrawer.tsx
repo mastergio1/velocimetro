@@ -37,8 +37,8 @@ export function MemoryDrawer() {
               Memoria
             </Drawer.Title>
             <Drawer.Description className="mt-1 text-sm text-muted">
-              Últimos análisis en este teléfono. El catálogo guarda el desbloqueo por
-              gamma.
+              Últimos análisis en este teléfono. El catálogo guarda todos, sin tope de
+              marcas.
             </Drawer.Description>
 
             <div className="mt-5 space-y-3">

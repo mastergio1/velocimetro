@@ -19,6 +19,7 @@ export type VehicleId = {
   color: string;
   description: string;
   funFact: string;
+  klass?: string;
 };
 
 export type MemoryEntry = VehicleId & {
@@ -65,8 +66,9 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export const HISTORY_LEN = 96;
 export const MEMORY_KEY = "velox-garage";
-export const MEMORY_MAX = 40;
-export const IDENTIFY_MAX = 10;
+export const MEMORY_MAX = 80;
+export const IDENTIFY_MAX = 80;
 export const DEX_KEY = "velox-dex";
 export const WILD_KEY = "velox-wilds";
-export const WILD_MAX = 24;
+export const COLLECTION_KEY = "velox-collection";
+export const COLLECTION_MAX = 500;

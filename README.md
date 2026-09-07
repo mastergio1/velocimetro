@@ -9,12 +9,7 @@ Repo: [mastergio1/velocimetro](https://github.com/mastergio1/velocimetro)
 - Bloquea el auto en el retículo y estima su velocidad (óptica, no es un radar de tráfico).
 - En demo, los autos de la calle se identifican al bloquearlos.
 - Con cámara, **Identificar** manda el recuadre a Grok (visión) y arma marca, modelo, color, descripción y dato.
-- **Catálogo**: cada auto analizado se desbloquea y queda archivado por **gamma**. Las gammas son las rarezas:
-  - Gamma Calle — común
-  - Gamma Sport — poco frecuente
-  - Gamma Selecta — rara
-  - Gamma Élite — épica
-  - Gamma Mito — mítica
+- **Catálogo**: archivo abierto. Cualquier auto que identifiques se desbloquea, sin lista cerrada de marcas. Las **gammas** son las rarezas (Calle, Sport, Selecta, Élite, Mito), no un cupo.
 - **Memoria** guarda las últimas fichas en este teléfono.
 
 ## Cómo correrlo
@@ -39,5 +34,5 @@ npm run typecheck
 ## Notas
 
 - La velocidad en cámara es una estimación (ancho típico ~1,8 m, calibrable en Ajustes). Mejor con el teléfono quieto y el auto centrado.
-- Las fichas IA son bajo demanda (máx. 10 por sesión) para no gastar cuota de más.
+- Las fichas IA reconocen cualquier marca (no solo un álbum fijo). Hay un tope alto por sesión para no gastar cuota de más.
 - Sin cuentas ni base de datos: memoria y catálogo viven en el dispositivo.

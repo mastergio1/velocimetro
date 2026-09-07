@@ -18,7 +18,7 @@ export const GAMMAS: Gamma[] = [
     name: "Gamma Calle",
     rarity: "Común",
     tag: "I",
-    blurb: "El tráfico de todos los días. Se desbloquea en cualquier esquina.",
+    blurb: "El tráfico de todos los días. Cualquier marca entra aquí.",
   },
   {
     id: "sport",
@@ -73,6 +73,14 @@ export type WildEntry = VehicleId & {
   id: string;
   gamma: GammaId;
   at: number;
+};
+
+export type CollectionEntry = VehicleId & {
+  id: string;
+  gamma: GammaId;
+  at: number;
+  sightings: number;
+  lastSpeedKmh: number;
 };
 
 export const FLEET: FleetCar[] = [
@@ -477,12 +485,13 @@ export const CATALOG: CatalogCar[] = [
 ];
 
 const MITO_RE =
-  /ferrari|lamborghini|bugatti|mclaren|pagani|koenigsegg|chiron|laferrari|aventador|huracan|huracán|p1|senna|veyron|sf90|revuelto/i;
-const ELITE_RE = /911|gt-r|gtr|corvette|amg gt|aston|bentley|rolls|lfa|nsx|continental gt|db11|812/i;
+  /ferrari|lamborghini|bugatti|mclaren|pagani|koenigsegg|rimac|chiron|laferrari|aventador|huracan|huracán|revuelto|sf90|la ferrari|p1|senna|veyron|agera|jesko|huayra|zonda|nevera|valkyrie|amg one|918 spyder|carrera gt/i;
+const ELITE_RE =
+  /911|gt-r|gtr|corvette|amg gt|aston|bentley|rolls|lfa|nsx|continental gt|db11|db12|812|maserati mc|lexus lfa|honda nsx|viper|superleggera|vanquish|ghost|phantom|wraith/i;
 const SELECTA_RE =
-  /\bm[2-8]\b|rs\s*[3-7]|type r|cayman|boxster|giulia|c63|e63|m3|m4|m5|quadrifoglio|alpina/i;
+  /\bm[2-8]\b|rs\s*[3-7]|type r|cayman|boxster|giulia|c63|e63|m3|m4|m5|m2|m8|quadrifoglio|alpina|s3 sportback|golf r|audi r8|rs6|rs7|c63|cls 63|panamera turbo|m340|m440/i;
 const SPORT_RE =
-  /gti|mustang|wrx|mx-5|miata|cooper s|brz|gr86|camaro|challenger|raptor|st\b|cupra|golf r/i;
+  /gti|mustang|wrx|mx-5|miata|cooper s|brz|gr86|camaro|challenger|charger|raptor|cupra|golf r|veloster n|focus st|fiesta st|megane rs|clio rs|swift sport|mazda 3 turbo|civic si|bronco raptor|ranger raptor|hilux|amarok v6|tacoma trd/i;
 
 export function gammaById(id: GammaId): Gamma {
   return GAMMAS.find((g) => g.id === id) ?? GAMMAS[0]!;
@@ -531,16 +540,56 @@ export function matchCatalog(make: string, model: string): CatalogCar | undefine
   return scored[0]?.car;
 }
 
-export function inferGamma(make: string, model: string): GammaId {
+export function inferGamma(make: string, model: string, klass?: string): GammaId {
+  const cls = (klass ?? "").toLowerCase();
+  if (/hyper|hypercar|prototype|one-off/.test(cls)) return "mito";
+  if (/super|supercar|gt3|gt2|gt4/.test(cls)) return "elite";
+  if (/hot hatch|sport|coupe|coupé|roadster|muscle/.test(cls)) {
+    const blob = `${make} ${model}`;
+    if (SELECTA_RE.test(blob) || ELITE_RE.test(blob)) return "selecta";
+    return "sport";
+  }
   const blob = `${make} ${model}`;
-  if (MITO_RE.test(blob)) return "mito";
-  if (ELITE_RE.test(blob)) return "elite";
+  if (MITO_RE.test(blob) || MITO_RE.test(make)) return "mito";
+  if (ELITE_RE.test(blob) || /ferrari|lamborghini|bugatti|mclaren|pagani|koenigsegg/.test(make))
+    return "elite";
   if (SELECTA_RE.test(blob)) return "selecta";
   if (SPORT_RE.test(blob)) return "sport";
+  if (/ferrari|lamborghini|bugatti|mclaren|pagani|koenigsegg|rimac/.test(make)) return "mito";
+  if (/porsche|aston martin|rolls-royce|bentley|maserati/.test(make)) return "elite";
+  if (/bmw|mercedes-amg|audi|alfa romeo/.test(make) && /m |amg|rs |type r|quadrifoglio/i.test(model))
+    return "selecta";
   return "calle";
 }
 
 export function wildId(make: string, model: string): string {
   const slug = normName(`${make}-${model}`).replace(/\s+/g, "-") || "auto";
   return `wild-${slug}`;
+}
+
+export function entryKey(make: string, model: string): string {
+  return `${normName(make)}|${normName(model)}`;
+}
+
+export function toCollectionEntry(
+  vehicle: VehicleId,
+  speedKmh: number,
+  prev?: CollectionEntry,
+): CollectionEntry {
+  const hit = matchCatalog(vehicle.make, vehicle.model);
+  const id = prev?.id ?? hit?.id ?? wildId(vehicle.make, vehicle.model);
+  return {
+    id,
+    make: vehicle.make,
+    model: vehicle.model,
+    year: vehicle.year || hit?.year || prev?.year || "",
+    color: vehicle.color || prev?.color || hit?.color || "",
+    description: (hit?.description || vehicle.description || prev?.description || "").slice(0, 180),
+    funFact: (hit?.funFact || vehicle.funFact || prev?.funFact || "").slice(0, 220),
+    klass: vehicle.klass || prev?.klass,
+    gamma: hit?.gamma ?? inferGamma(vehicle.make, vehicle.model, vehicle.klass),
+    at: Date.now(),
+    sightings: (prev?.sightings ?? 0) + 1,
+    lastSpeedKmh: speedKmh,
+  };
 }

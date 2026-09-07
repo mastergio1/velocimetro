@@ -1,6 +1,6 @@
 import type { LockedTarget, VehicleId } from "@/lib/speed/types";
 import { formatDistance, formatSpeed, speedUnit } from "@/lib/speed/format";
-import { gammaById, matchCatalog } from "@/lib/speed/catalog";
+import { gammaById, inferGamma, matchCatalog } from "@/lib/speed/catalog";
 import { useVelox } from "@/lib/speed/store";
 
 export function CarCard({
@@ -14,7 +14,9 @@ export function CarCard({
   const status = useVelox((s) => s.identifyStatus);
   const err = useVelox((s) => s.identifyError);
   const hit = id ? matchCatalog(id.make, id.model) : undefined;
-  const gamma = hit ? gammaById(hit.gamma) : null;
+  const gamma = id
+    ? gammaById(hit?.gamma ?? inferGamma(id.make, id.model, id.klass))
+    : null;
 
   if (!lock && !id) return null;
 
@@ -52,7 +54,8 @@ export function CarCard({
       ) : lock ? (
         <p className="text-sm text-muted">
           Blanco a {formatDistance(lock.distanceM, units).value}{" "}
-          {formatDistance(lock.distanceM, units).unit}. Pulsa Identificar para la ficha IA.
+          {formatDistance(lock.distanceM, units).unit}. La ficha se arma sola al
+          mantener el auto en el retículo.
         </p>
       ) : null}
     </div>

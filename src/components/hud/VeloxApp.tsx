@@ -47,8 +47,7 @@ export function VeloxApp() {
   const identifiedLockId = useVelox((s) => s.identifiedLockId);
   const identifyStatus = useVelox((s) => s.identifyStatus);
   const remember = useVelox((s) => s.remember);
-  const unlocks = useVelox((s) => s.unlocks);
-  const wilds = useVelox((s) => s.wilds);
+  const collection = useVelox((s) => s.collection);
 
   const [clock, setClock] = useState("--:--");
   useEffect(() => {
@@ -103,7 +102,7 @@ export function VeloxApp() {
     if (live.identifyCount >= IDENTIFY_MAX) {
       useVelox.setState({
         identifyStatus: "error",
-        identifyError: "Llegaste al límite de fichas IA en esta sesión.",
+        identifyError: "Pausa de fichas IA en esta sesión. La pistola sigue midiendo velocidad.",
       });
       return;
     }
@@ -133,6 +132,30 @@ export function VeloxApp() {
       });
     }
   }
+
+  const identifyRef = useRef(onIdentify);
+  identifyRef.current = onIdentify;
+
+  useEffect(() => {
+    if (channel !== "camera") return;
+    if (!lock) return;
+    const live = useVelox.getState();
+    if (live.identifiedLockId === lock.id) return;
+    if (live.identifyStatus === "loading") return;
+    if (live.identifyStatus === "error") {
+      useVelox.setState({ identifyStatus: "idle", identifyError: null });
+    }
+  }, [channel, lock?.id]);
+
+  useEffect(() => {
+    if (channel !== "camera") return;
+    if (!lock || identifiedLockId === lock.id) return;
+    if (identifyStatus !== "idle") return;
+    const timer = window.setTimeout(() => {
+      void identifyRef.current();
+    }, 1100);
+    return () => window.clearTimeout(timer);
+  }, [channel, lock?.id, identifiedLockId, identifyStatus]);
 
   return (
     <main className="relative isolate h-dvh overflow-x-hidden bg-bg text-fg">
@@ -184,7 +207,7 @@ export function VeloxApp() {
               className="hud-kicker inline-flex min-h-8 items-center gap-1.5 rounded-sm border border-line/80 bg-bg/55 px-2 py-1 text-hud"
             >
               <LayoutGrid className="size-3.5" />
-              Catálogo {unlocks.length + wilds.length}
+              Catálogo {collection.length}
             </Link>
           </div>
         </header>
@@ -193,8 +216,8 @@ export function VeloxApp() {
           {channel === "demo"
             ? "Demo de calle: el retículo bloquea un auto, lee su velocidad y arma la ficha. Activa la cámara para medir de verdad."
             : lock
-              ? "Mantén el auto en el centro. Identificar genera marca, modelo, descripción y un dato con IA."
-              : "Apunta la cámara a un auto en movimiento y espera el bloqueo."}
+              ? "Mantén el auto en el centro: se identifica solo (cualquier marca) y entra al catálogo."
+              : "Apunta la cámara a cualquier auto en movimiento y espera el bloqueo."}
         </p>
 
         {cameraError ? (
