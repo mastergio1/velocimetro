@@ -166,6 +166,8 @@ export function VeloxApp() {
           "absolute inset-0 size-full object-cover",
           cameraReady ? "opacity-100" : "opacity-0",
         )}
+        poster="/demo/night.jpg"
+        loop
         playsInline
         muted
         autoPlay

@@ -20,6 +20,30 @@ import { HISTORY_LEN, type BBox, type LockedTarget } from "./types";
 
 const ANALYSIS_W = 240;
 const ANALYSIS_H = 135;
+const DEMO_SRC = "/demo/night.mp4";
+
+export async function playDemo(video: HTMLVideoElement | null) {
+  if (!video) return;
+  const leftover = video.srcObject;
+  if (leftover instanceof MediaStream) {
+    for (const t of leftover.getTracks()) t.stop();
+    video.srcObject = null;
+  }
+  video.loop = true;
+  video.muted = true;
+  video.playsInline = true;
+  video.setAttribute("playsinline", "true");
+  video.setAttribute("webkit-playsinline", "true");
+  if (!video.getAttribute("src")?.includes("night.mp4")) {
+    video.src = DEMO_SRC;
+  }
+  try {
+    await video.play();
+    useVelox.setState({ cameraReady: true, cameraError: null });
+  } catch {
+    useVelox.setState({ cameraReady: false });
+  }
+}
 
 export type EngineRefs = {
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -140,12 +164,7 @@ export function useVeloxEngine(refs: EngineRefs) {
   useEffect(() => {
     if (cameraOn) return;
     const video = refsRef.current.videoRef.current;
-    const stream = video?.srcObject;
-    if (stream instanceof MediaStream) {
-      for (const t of stream.getTracks()) t.stop();
-      if (video) video.srcObject = null;
-    }
-    useVelox.setState({ cameraReady: false });
+    void playDemo(video);
   }, [cameraOn]);
 
   useEffect(() => {
@@ -174,7 +193,7 @@ export function useVeloxEngine(refs: EngineRefs) {
       const dt = Math.min(0.05, Math.max(0.008, (now - last) / 1000));
       last = now;
       const store = useVelox.getState();
-      const { settings, cameraReady } = store;
+      const { settings } = store;
       const { videoRef, simRef, overlayRef, analysisRef } = refsRef.current;
       const video = videoRef.current;
       const sim = simRef.current;
@@ -182,8 +201,8 @@ export function useVeloxEngine(refs: EngineRefs) {
       const aCanvas = analysisRef.current;
       const aCtx = aCanvas?.getContext("2d", { willReadFrequently: true });
 
-      const useCamera = store.cameraOn && cameraReady && video != null && video.readyState >= 2;
-      const channel: "demo" | "camera" = useCamera ? "camera" : "demo";
+      const hasFrames = video != null && video.readyState >= 2 && video.videoWidth > 0;
+      const channel: "demo" | "camera" = store.cameraOn ? "camera" : "demo";
 
       let lock: LockedTarget | null = null;
       const boxes: { id: string; bbox: BBox }[] = [];
@@ -200,7 +219,7 @@ export function useVeloxEngine(refs: EngineRefs) {
         canvasH = h;
         const sCtx = sim.getContext("2d");
         if (sCtx) {
-          if (useCamera) {
+          if (hasFrames) {
             sCtx.clearRect(0, 0, w, h);
           } else {
             road = tickRoad(road, dt, true);
@@ -237,7 +256,7 @@ export function useVeloxEngine(refs: EngineRefs) {
         if (overlay) resizeCanvas(overlay, cssW, cssH, dpr);
       }
 
-      if (useCamera && aCtx && aCanvas && video) {
+      if (hasFrames && aCtx && aCanvas && video) {
         drawCover(aCtx, video, video.videoWidth, video.videoHeight, ANALYSIS_W, ANALYSIS_H);
         const img = aCtx.getImageData(0, 0, ANALYSIS_W, ANALYSIS_H);
         const gray = new Uint8Array(ANALYSIS_W * ANALYSIS_H);
@@ -397,6 +416,8 @@ export async function enableCamera(video: HTMLVideoElement | null) {
   try {
     const facing = useVelox.getState().settings.cameraFacing;
     const stream = await openCamera(facing);
+    video.removeAttribute("src");
+    video.load();
     attachStream(video, stream);
     await video.play();
     useVelox.setState({ cameraOn: true, cameraReady: true, cameraError: null });
@@ -416,7 +437,7 @@ export async function enableCamera(video: HTMLVideoElement | null) {
 }
 
 export function disableCamera() {
-  useVelox.setState({ cameraOn: false, cameraReady: false, cameraError: null });
+  useVelox.setState({ cameraOn: false, cameraError: null });
 }
 
 export function captureLockJpeg(
