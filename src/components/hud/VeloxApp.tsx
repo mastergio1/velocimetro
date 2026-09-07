@@ -49,6 +49,7 @@ export function VeloxApp() {
   const incognito = useVelox((s) => s.settings.incognito);
 
   const [clock, setClock] = useState("--:--");
+  const [openingCam, setOpeningCam] = useState(false);
   useEffect(() => {
     setClock(formatClock(new Date()));
     const id = window.setInterval(() => setClock(formatClock(new Date())), 1000);
@@ -244,10 +245,18 @@ export function VeloxApp() {
           <Button
             variant={cameraOn ? "default" : "hud"}
             className="min-h-12 flex-1"
-            onClick={() => (cameraOn ? disableCamera() : void enableCamera())}
+            disabled={openingCam}
+            onClick={() => {
+              if (cameraOn) {
+                disableCamera();
+                return;
+              }
+              setOpeningCam(true);
+              void enableCamera(videoRef.current).finally(() => setOpeningCam(false));
+            }}
           >
             <Camera />
-            {cameraOn ? "Cámara activa" : "Activar cámara"}
+            {openingCam ? "Abriendo…" : cameraOn ? "Cámara activa" : "Activar cámara"}
           </Button>
           <Button
             variant={needsAi ? "default" : "hud"}

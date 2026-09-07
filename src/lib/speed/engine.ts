@@ -1,6 +1,6 @@
 import type { RefObject } from "react";
 import { useEffect, useRef } from "react";
-import { cameraErrorMessage, openCamera } from "./camera";
+import { attachStream, cameraErrorMessage, openCamera } from "./camera";
 import { fleetById } from "./catalog";
 import { requestMotionPermission } from "./gps";
 import { findMovingRegions, pickLock, rgbaToGray } from "./motion";
@@ -132,62 +132,21 @@ export function useVeloxEngine(refs: EngineRefs) {
   refsRef.current = refs;
 
   const cameraOn = useVelox((s) => s.cameraOn);
-  const facing = useVelox((s) => s.settings.cameraFacing);
 
   useEffect(() => {
     useVelox.getState().hydrate();
   }, []);
 
   useEffect(() => {
-    if (!cameraOn) {
-      const video = refsRef.current.videoRef.current;
-      const stream = video?.srcObject;
-      if (stream instanceof MediaStream) {
-        for (const t of stream.getTracks()) t.stop();
-        if (video) video.srcObject = null;
-      }
-      useVelox.setState({ cameraReady: false });
-      return;
-    }
-
-    let cancelled = false;
+    if (cameraOn) return;
     const video = refsRef.current.videoRef.current;
-    if (!video) return;
-
-    (async () => {
-      useVelox.setState({ cameraError: null });
-      try {
-        await requestMotionPermission();
-        const stream = await openCamera(facing);
-        if (cancelled) {
-          for (const t of stream.getTracks()) t.stop();
-          return;
-        }
-        video.srcObject = stream;
-        video.playsInline = true;
-        video.muted = true;
-        video.setAttribute("playsinline", "true");
-        video.setAttribute("webkit-playsinline", "true");
-        await video.play();
-        useVelox.setState({ cameraReady: true, cameraError: null });
-      } catch (err) {
-        useVelox.setState({
-          cameraReady: false,
-          cameraError: cameraErrorMessage(err),
-          cameraOn: false,
-        });
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      const stream = video.srcObject;
-      if (stream instanceof MediaStream) {
-        for (const t of stream.getTracks()) t.stop();
-        video.srcObject = null;
-      }
-    };
-  }, [cameraOn, facing]);
+    const stream = video?.srcObject;
+    if (stream instanceof MediaStream) {
+      for (const t of stream.getTracks()) t.stop();
+      if (video) video.srcObject = null;
+    }
+    useVelox.setState({ cameraReady: false });
+  }, [cameraOn]);
 
   useEffect(() => {
     const range = new RangeTracker();
@@ -419,19 +378,45 @@ export function useVeloxEngine(refs: EngineRefs) {
   }, []);
 }
 
-export async function enableCamera() {
+export async function enableCamera(video: HTMLVideoElement | null) {
   useVelox.setState({
-    cameraOn: true,
     cameraError: null,
     identification: null,
     identifiedLockId: null,
     identifyError: null,
     identifyStatus: "idle",
   });
+  if (!video) {
+    useVelox.setState({
+      cameraOn: false,
+      cameraReady: false,
+      cameraError: "No hay visor. Recarga y pulsa Cámara otra vez.",
+    });
+    return;
+  }
+  try {
+    const facing = useVelox.getState().settings.cameraFacing;
+    const stream = await openCamera(facing);
+    attachStream(video, stream);
+    await video.play();
+    useVelox.setState({ cameraOn: true, cameraReady: true, cameraError: null });
+    void requestMotionPermission();
+  } catch (err) {
+    const leftover = video.srcObject;
+    if (leftover instanceof MediaStream) {
+      for (const t of leftover.getTracks()) t.stop();
+      video.srcObject = null;
+    }
+    useVelox.setState({
+      cameraOn: false,
+      cameraReady: false,
+      cameraError: cameraErrorMessage(err),
+    });
+  }
 }
 
 export function disableCamera() {
-  useVelox.setState({ cameraOn: false, cameraReady: false });
+  useVelox.setState({ cameraOn: false, cameraReady: false, cameraError: null });
 }
 
 export function captureLockJpeg(
