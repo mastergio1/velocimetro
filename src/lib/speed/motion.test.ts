@@ -18,11 +18,11 @@ describe("pickLock", () => {
     assert.equal(picked, center);
   });
 
-  it("sticks to the previous box when it still overlaps", () => {
-    const prev = box(20, 80, 50, 30);
-    const moved = box(24, 84, 50, 30);
-    const other = box(200, 120, 50, 30);
-    const picked = pickLock([other, moved], 400, 220, "lock-1", prev);
+  it("does not jump to a far box while the lock still overlaps", () => {
+    const prev = box(20, 80, 50, 30, 80);
+    const moved = box(30, 86, 48, 28, 70);
+    const far = box(220, 40, 80, 40, 200);
+    const picked = pickLock([far, moved], 400, 220, "lock-1", prev);
     assert.equal(picked, moved);
   });
 });

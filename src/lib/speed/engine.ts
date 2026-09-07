@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { attachStream, cameraErrorMessage, openCamera } from "./camera";
 import { fleetById } from "./catalog";
 import { requestMotionPermission } from "./gps";
-import { findMovingRegions, pickLock, rgbaToGray } from "./motion";
+import { findMovingRegions, lerpBox, pickLock, rgbaToGray } from "./motion";
 import { FlowTracker, flowSpeedMps } from "./optical-flow";
 import {
   drawRoad,
@@ -20,7 +20,6 @@ import { HISTORY_LEN, type BBox, type LockedTarget } from "./types";
 
 const ANALYSIS_W = 240;
 const ANALYSIS_H = 135;
-const DEMO_SRC = "/demo/night.mp4";
 
 export async function playDemo(video: HTMLVideoElement | null) {
   if (!video) return;
@@ -29,30 +28,9 @@ export async function playDemo(video: HTMLVideoElement | null) {
     for (const t of leftover.getTracks()) t.stop();
     video.srcObject = null;
   }
-  video.loop = true;
-  video.muted = true;
-  video.defaultMuted = true;
-  video.autoplay = true;
-  video.playsInline = true;
-  video.setAttribute("playsinline", "true");
-  video.setAttribute("webkit-playsinline", "true");
-  if (!video.getAttribute("src")?.includes("night.mp4")) {
-    video.src = DEMO_SRC;
-  }
-  const markReady = () => useVelox.setState({ cameraReady: true, cameraError: null });
-  video.onplaying = markReady;
-  try {
-    await video.play();
-    markReady();
-  } catch {
-    video.addEventListener(
-      "canplay",
-      () => {
-        void video.play().then(markReady).catch(() => undefined);
-      },
-      { once: true },
-    );
-  }
+  video.removeAttribute("src");
+  video.load();
+  useVelox.setState({ cameraReady: false });
 }
 
 export type EngineRefs = {
@@ -324,16 +302,17 @@ export function useVeloxEngine(refs: EngineRefs) {
               flowV.speedMps,
               flowV.confidence,
             );
+            const smoothed = lastBox ? lerpBox(lastBox, bbox, 0.38) : bbox;
             lock = {
               id: "live",
-              bbox,
+              bbox: smoothed,
               speedMps: range.speedMps,
               distanceM: range.distanceM,
               confidence: range.confidence,
               fleetId: null,
             };
             held = lock;
-            holdUntil = now + 380;
+            holdUntil = now + 820;
           } else if (held && now < holdUntil) {
             lock = held;
           } else {
@@ -353,7 +332,7 @@ export function useVeloxEngine(refs: EngineRefs) {
       lastDist = lock?.distanceM ?? lastDist;
 
       const target = lock?.speedMps ?? 0;
-      displayMps = displayMps * 0.72 + target * 0.28;
+      displayMps = displayMps * 0.82 + target * 0.18;
       if (!lock) displayMps *= 0.9;
       if (displayMps < 0.2) displayMps = 0;
 

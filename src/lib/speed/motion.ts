@@ -9,6 +9,23 @@ export function rgbaToGray(data: Uint8ClampedArray, out: Uint8Array) {
   }
 }
 
+export function insetBox(b: BBox, t = 0.14): BBox {
+  const x = b.x + b.w * t;
+  const y = b.y + b.h * t * 0.7;
+  const w = b.w * (1 - t * 2);
+  const h = b.h * (1 - t * 1.6);
+  return { x, y, w: Math.max(8, w), h: Math.max(8, h) };
+}
+
+export function lerpBox(a: BBox, b: BBox, t: number): BBox {
+  return {
+    x: a.x + (b.x - a.x) * t,
+    y: a.y + (b.y - a.y) * t,
+    w: a.w + (b.w - a.w) * t,
+    h: a.h + (b.h - a.h) * t,
+  };
+}
+
 export function findMovingRegions(
   prev: Uint8Array,
   next: Uint8Array,
@@ -23,11 +40,11 @@ export function findMovingRegions(
 
   for (let y = 0; y < height; y++) {
     const gy = Math.min(gh - 1, Math.floor(y / cellH));
-    if (gy < gh * 0.22) continue;
+    if (gy < gh * 0.28 || gy > gh * 0.9) continue;
     const row = y * width;
     for (let x = 0; x < width; x++) {
       const d = Math.abs((next[row + x] ?? 0) - (prev[row + x] ?? 0));
-      if (d < 22) continue;
+      if (d < 26) continue;
       const gx = Math.min(gw - 1, Math.floor(x / cellW));
       heat[gy * gw + gx] += d;
     }
@@ -62,7 +79,7 @@ export function findMovingRegions(
         if (nx < 0 || ny < 0 || nx >= gw || ny >= gh) continue;
         const ni = ny * gw + nx;
         if (visited[ni]) continue;
-        if ((heat[ni] ?? 0) < 140) continue;
+        if ((heat[ni] ?? 0) < 170) continue;
         visited[ni] = 1;
         stack.push(ni);
       }
@@ -70,33 +87,34 @@ export function findMovingRegions(
     return { minX, maxX, minY, maxY, mass };
   };
 
+  const frameA = width * height;
   for (let y = 0; y < gh; y++) {
     for (let x = 0; x < gw; x++) {
       const i = y * gw + x;
-      if (visited[i] || (heat[i] ?? 0) < 220) continue;
+      if (visited[i] || (heat[i] ?? 0) < 260) continue;
       const r = flood(x, y);
       const bw = r.maxX - r.minX + 1;
       const bh = r.maxY - r.minY + 1;
       if (bw < 3 || bh < 2) continue;
       const aspect = bw / bh;
-      if (aspect < 0.9 || aspect > 4.2) continue;
-      const px = (r.minX / gw) * width;
-      const py = (r.minY / gh) * height;
-      const pw = (bw / gw) * width;
-      const ph = (bh / gh) * height;
-      if (pw * ph < width * height * 0.012) continue;
-      boxes.push({
-        x: px,
-        y: py,
-        w: pw,
-        h: ph,
-        score: r.mass,
-      });
+      if (aspect < 1.05 || aspect > 3.1) continue;
+      const raw = {
+        x: (r.minX / gw) * width,
+        y: (r.minY / gh) * height,
+        w: (bw / gw) * width,
+        h: (bh / gh) * height,
+      };
+      const area = raw.w * raw.h;
+      if (area < frameA * 0.016 || area > frameA * 0.3) continue;
+      const cy = raw.y + raw.h / 2;
+      if (cy < height * 0.34) continue;
+      const tight = insetBox(raw, 0.13);
+      boxes.push({ ...tight, score: r.mass });
     }
   }
 
   boxes.sort((a, b) => b.score - a.score);
-  return boxes.slice(0, 5);
+  return boxes.slice(0, 4);
 }
 
 export function pickLock(
@@ -110,21 +128,40 @@ export function pickLock(
   const cx = frameW / 2;
   const cy = frameH * 0.58;
   if (prevBox && prevId) {
-    const overlap = boxes.find((b) => iou(b, prevBox) > 0.18);
-    if (overlap) return overlap;
+    let sticky: MotionBox | null = null;
+    let stickyIou = 0;
+    for (const b of boxes) {
+      const o = iou(b, prevBox);
+      if (o > stickyIou) {
+        stickyIou = o;
+        sticky = b;
+      }
+    }
+    if (sticky && stickyIou > 0.26) return sticky;
+    if (sticky && stickyIou > 0.12) {
+      const center = boxes.reduce((best, b) => {
+        const d = dist2(b, cx, cy);
+        return d < dist2(best, cx, cy) ? b : best;
+      }, boxes[0]!);
+      if (sticky.score >= center.score * 0.55) return sticky;
+    }
   }
   let best = boxes[0]!;
   let bestD = Infinity;
   for (const b of boxes) {
-    const dx = b.x + b.w / 2 - cx;
-    const dy = b.y + b.h / 2 - cy;
-    const d = dx * dx + dy * dy * 0.6;
+    const d = dist2(b, cx, cy);
     if (d < bestD) {
       bestD = d;
       best = b;
     }
   }
   return best;
+}
+
+function dist2(b: BBox, cx: number, cy: number) {
+  const dx = b.x + b.w / 2 - cx;
+  const dy = b.y + b.h / 2 - cy;
+  return dx * dx + dy * dy * 0.55;
 }
 
 function iou(a: BBox, b: BBox) {

@@ -57,21 +57,6 @@ export function VeloxApp() {
   }, []);
 
   useEffect(() => {
-    const kick = () => {
-      const v = videoRef.current;
-      if (!v || !v.paused) return;
-      v.muted = true;
-      void v.play().catch(() => undefined);
-    };
-    window.addEventListener("touchstart", kick, { passive: true });
-    window.addEventListener("pointerdown", kick);
-    return () => {
-      window.removeEventListener("touchstart", kick);
-      window.removeEventListener("pointerdown", kick);
-    };
-  }, []);
-
-  useEffect(() => {
     if (cameraOn) return;
     if (!lock?.fleetId) return;
     const spec = fleetById(lock.fleetId);
@@ -180,17 +165,13 @@ export function VeloxApp() {
     >
       <video
         ref={videoRef}
-        className="velox-demo pointer-events-none absolute inset-0 size-full object-cover"
-        src="/demo/night.mp4"
+        className={cn(
+          "absolute inset-0 size-full object-cover",
+          cameraReady ? "opacity-100" : "opacity-0",
+        )}
         poster="/demo/night.jpg"
-        preload="auto"
-        autoPlay
-        loop
-        muted
         playsInline
-        controls={false}
-        disablePictureInPicture
-        disableRemotePlayback
+        muted
       />
       <canvas ref={simRef} className="pointer-events-none absolute inset-0 size-full opacity-0" />
       <canvas
