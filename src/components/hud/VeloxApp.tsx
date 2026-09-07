@@ -82,6 +82,7 @@ export function VeloxApp() {
   const display = toDisplaySpeed(speedMps, units);
   const limit = limitInDisplay(limitKmh, units);
   const over = display >= limit && speedMps > 1;
+  const near = !over && display >= limit * 0.85 && speedMps > 1;
   const unit = speedUnit(units);
   const dist = lock ? formatDistance(lock.distanceM, units) : null;
   const needsAi = channel === "camera" && !!lock && identifiedLockId !== lock.id;
@@ -191,10 +192,15 @@ export function VeloxApp() {
           </p>
           <div className="flex flex-wrap items-center justify-end gap-1.5">
             <span className="hud-chip tabular-nums text-hud">{clock}</span>
-            <span className={cn("hud-chip", lock ? "border-hud text-hud" : "text-muted")}>
+            <span
+              className={cn(
+                "hud-chip",
+                lock ? "hud-chip-lock" : "text-muted",
+              )}
+            >
               {lock ? "LOCK" : "SCAN"}
             </span>
-            {over ? <span className="hud-chip border-danger text-danger">FAST</span> : null}
+            {over ? <span className="hud-chip hud-chip-fast">FAST</span> : null}
             {incognito ? <span className="hud-chip border-warn text-warn">PRIV</span> : null}
             <Link
               to="/catalogo"
@@ -219,15 +225,15 @@ export function VeloxApp() {
           <p
             className={cn(
               "font-condensed led-speed text-speed leading-none font-bold",
-              over ? "text-danger" : "text-hud",
+              over ? "led-fast text-danger" : near ? "text-warn" : lock ? "led-lock text-hud" : "text-hud",
             )}
           >
             {formatSpeed(speedMps, units)}
           </p>
-          <p className="hud-kicker mt-1 text-hud">
+          <p className={cn("hud-kicker mt-1", over ? "text-danger" : "text-hud")}>
             {unit}
             {dist ? ` · DIST ${dist.value}${dist.unit}` : ""}
-            {over ? " · FAST" : ""}
+            {over ? " · EXCESO" : near ? " · LÍMITE" : ""}
           </p>
           {identification ? (
             <div className="glass-dock mt-3 rounded-md px-3 py-2 text-left">

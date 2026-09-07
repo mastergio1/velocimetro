@@ -110,10 +110,47 @@
     max-height: 88dvh;
     padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
   }
+  .hud-chip-lock {
+    border-color: var(--color-hud);
+    color: var(--color-bg);
+    background: var(--color-hud);
+  }
+
+  .hud-chip-fast {
+    border-color: var(--color-danger);
+    color: var(--color-bg);
+    background: var(--color-danger);
+  }
+
+  .led-lock {
+    animation: velox-lock 1.6s ease-in-out infinite;
+  }
+
+  .led-fast {
+    animation: velox-fast 0.7s ease-in-out infinite;
+  }
+
+  @keyframes velox-lock {
+    50% {
+      filter: brightness(1.25);
+    }
+  }
+
+  @keyframes velox-fast {
+    50% {
+      opacity: 0.72;
+      filter: brightness(1.2);
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+
+  .led-lock,
+  .led-fast {
+    animation: none;
   }
 }
