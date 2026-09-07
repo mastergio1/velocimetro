@@ -36,11 +36,25 @@ export function isVehicleLike(b: BBox, frameW: number, frameH: number, distM?: n
 
 export function isObjectLike(b: BBox, frameW: number, frameH: number): boolean {
   const area = (b.w * b.h) / Math.max(1, frameW * frameH);
-  if (area < 0.003 || area > 0.42) return false;
-  if (b.w > frameW * 0.55 || b.h > frameH * 0.58) return false;
+  if (area < 0.002 || area > 0.28) return false;
+  if (b.w > frameW * 0.38 || b.h > frameH * 0.58) return false;
+  const aspect = b.w / Math.max(1, b.h);
+  if (aspect < 0.22 || aspect > 2.1) return false;
   const cy = b.y + b.h / 2;
-  if (cy < frameH * 0.14 || cy > frameH * 0.88) return false;
+  if (cy < frameH * 0.12 || cy > frameH * 0.8) return false;
   return true;
+}
+
+function objectScore(b: BBox, frameH: number): number {
+  const cy = (b.y + b.h / 2) / frameH;
+  const aspect = b.w / Math.max(1, b.h);
+  let s = 1;
+  if (cy < 0.16 || cy > 0.76) s *= 0.12;
+  else if (cy >= 0.26 && cy <= 0.64) s *= 1;
+  else s *= 0.4;
+  if (aspect >= 0.32 && aspect <= 1.2) s *= 1.5;
+  if (aspect > 1.7) s *= 0.25;
+  return s;
 }
 
 export function findMovingRegions(
@@ -48,16 +62,19 @@ export function findMovingRegions(
   next: Uint8Array,
   width: number,
   height: number,
+  kind: "vehicle" | "object" = "vehicle",
 ): MotionBox[] {
   const gw = 40;
   const gh = 24;
   const cellW = width / gw;
   const cellH = height / gh;
   const heat = new Float32Array(gw * gh);
+  const y0 = kind === "object" ? 0.12 : 0.24;
+  const y1 = kind === "object" ? 0.82 : 0.64;
 
   for (let y = 0; y < height; y++) {
     const gy = Math.min(gh - 1, Math.floor(y / cellH));
-    if (gy < gh * 0.24 || gy > gh * 0.64) continue;
+    if (gy < gh * y0 || gy > gh * y1) continue;
     const row = y * width;
     for (let x = 0; x < width; x++) {
       const d = Math.abs((next[row + x] ?? 0) - (prev[row + x] ?? 0));
@@ -112,9 +129,13 @@ export function findMovingRegions(
       const r = flood(x, y);
       const bw = r.maxX - r.minX + 1;
       const bh = r.maxY - r.minY + 1;
-      if (bw < 2 || bh < 2 || bw > 16 || bh > 10) continue;
+      if (kind === "object") {
+        if (bw < 2 || bh < 2 || bw > 12 || bh > 16) continue;
+      } else if (bw < 2 || bh < 2 || bw > 16 || bh > 10) continue;
       const aspect = bw / bh;
-      if (aspect < 0.85 || aspect > 4.8) continue;
+      if (kind === "object") {
+        if (aspect < 0.28 || aspect > 2.2) continue;
+      } else if (aspect < 0.85 || aspect > 4.8) continue;
       const raw = {
         x: (r.minX / gw) * width,
         y: (r.minY / gh) * height,
@@ -122,17 +143,29 @@ export function findMovingRegions(
         h: (bh / gh) * height,
       };
       const area = raw.w * raw.h;
-      if (area < frameA * 0.004 || area > frameA * 0.16) continue;
-      if (raw.h > height * 0.36 || raw.w > width * 0.44) continue;
+      if (kind === "object") {
+        if (area < frameA * 0.002 || area > frameA * 0.14) continue;
+        if (raw.h > height * 0.55 || raw.w > width * 0.36) continue;
+      } else {
+        if (area < frameA * 0.004 || area > frameA * 0.16) continue;
+        if (raw.h > height * 0.36 || raw.w > width * 0.44) continue;
+      }
       const tight = insetBox(raw, 0.08);
-      const aspectN =
-        tight.w / Math.max(1, tight.h) >= 1.15 && tight.w / Math.max(1, tight.h) <= 3.8
-          ? 1
-          : 0.35;
-      boxes.push({
-        ...tight,
-        score: r.mass * roadScore(tight, height) * aspectN,
-      });
+      if (kind === "object") {
+        boxes.push({
+          ...tight,
+          score: r.mass * objectScore(tight, height),
+        });
+      } else {
+        const aspectN =
+          tight.w / Math.max(1, tight.h) >= 1.15 && tight.w / Math.max(1, tight.h) <= 3.8
+            ? 1
+            : 0.35;
+        boxes.push({
+          ...tight,
+          score: r.mass * roadScore(tight, height) * aspectN,
+        });
+      }
     }
   }
 
@@ -177,6 +210,41 @@ export function pickLock(
   for (const b of pool) {
     const d = dist2(b, cx, cy);
     const s = (b.score * roadScore(b, frameH)) / (1 + d / (frameW * frameW * 0.2));
+    if (s > bestS) {
+      bestS = s;
+      best = b;
+    }
+  }
+  return best;
+}
+
+export function pickObject(
+  boxes: MotionBox[],
+  frameW: number,
+  frameH: number,
+  prevBox: BBox | null,
+  aim?: { x: number; y: number } | null,
+): MotionBox | null {
+  const pool = boxes.filter((b) => isObjectLike(b, frameW, frameH));
+  if (pool.length === 0) return null;
+  if (prevBox) {
+    let sticky: MotionBox | null = null;
+    let stickyIou = 0;
+    for (const b of pool) {
+      const o = boxIou(b, prevBox);
+      if (o > stickyIou) {
+        stickyIou = o;
+        sticky = b;
+      }
+    }
+    if (sticky && stickyIou > 0.16) return sticky;
+  }
+  const ax = aim?.x ?? frameW / 2;
+  const ay = aim?.y ?? frameH * 0.42;
+  let best = pool[0]!;
+  let bestS = -1;
+  for (const b of pool) {
+    const s = (b.score * objectScore(b, frameH)) / (1 + dist2(b, ax, ay) / (frameW * frameW * 0.12));
     if (s > bestS) {
       bestS = s;
       best = b;

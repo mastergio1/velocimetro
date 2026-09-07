@@ -251,7 +251,7 @@ export function VeloxApp() {
         ) : !lock ? (
           <p className="mb-2 text-center text-xs text-muted">
             {gunMode === "disparo"
-              ? "Apunta el objeto. Al perderlo, congela la velocidad."
+              ? "Toca al skater u objeto. Al perderlo, congela la velocidad."
               : "Apunta un auto y tócalo para fijar el lock."}
           </p>
         ) : null}

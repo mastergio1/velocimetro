@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { pickLock, isVehicleLike, isObjectLike, findMovingRegions, grabPatch, trackPatch, type MotionBox } from "./motion.ts";
+import { pickLock, pickObject, isVehicleLike, isObjectLike, findMovingRegions, grabPatch, trackPatch, type MotionBox } from "./motion.ts";
 
 function box(x: number, y: number, w = 40, h = 24, score = 1): MotionBox {
   return { x, y, w, h, score };
@@ -59,6 +59,19 @@ describe("isObjectLike", () => {
   it("rejects a mural-sized blob", () => {
     assert.equal(isObjectLike({ x: 10, y: 40, w: 360, h: 500 }, 390, 700), false);
   });
+
+  it("rejects a wide ground strip", () => {
+    assert.equal(isObjectLike({ x: 10, y: 480, w: 320, h: 70 }, 390, 700), false);
+  });
+});
+
+describe("pickObject", () => {
+  it("prefers a person over a ground patch", () => {
+    const ground = box(20, 70, 80, 18, 90);
+    const skater = box(90, 40, 18, 40, 40);
+    const picked = pickObject([ground, skater], 200, 120, null);
+    assert.equal(picked, skater);
+  });
 });
 
 describe("findMovingRegions", () => {
@@ -78,6 +91,24 @@ describe("findMovingRegions", () => {
     assert.ok(boxes.length >= 1, "expected a motion blob");
     const cy = boxes[0]!.y + boxes[0]!.h / 2;
     assert.ok(cy > h * 0.28 && cy < h * 0.65, `cy ${cy}`);
+  });
+
+  it("finds a tall skater-like blob in object mode", () => {
+    const w = 160;
+    const h = 90;
+    const a = new Uint8Array(w * h).fill(30);
+    const b = new Uint8Array(w * h).fill(30);
+    const paint = (buf: Uint8Array, x0: number, y0: number, bw: number, bh: number) => {
+      for (let y = y0; y < y0 + bh; y++) {
+        for (let x = x0; x < x0 + bw; x++) buf[y * w + x] = 210;
+      }
+    };
+    paint(a, 70, 22, 14, 36);
+    paint(b, 82, 22, 14, 36);
+    const boxes = findMovingRegions(a, b, w, h, "object");
+    assert.ok(boxes.length >= 1, "expected an object blob");
+    const aspect = boxes[0]!.w / Math.max(1, boxes[0]!.h);
+    assert.ok(aspect < 1.4, `aspect ${aspect}`);
   });
 });
 

@@ -4,7 +4,7 @@ import { attachStream, cameraErrorMessage, openCamera } from "./camera";
 import { fleetById } from "./catalog";
 import { requestMotionPermission } from "./gps";
 import { BoxKalman } from "./kalman";
-import { boxIou, findMovingRegions, grabPatch, isObjectLike, isVehicleLike, pickLock, rgbaToGray, trackPatch } from "./motion";
+import { boxIou, findMovingRegions, grabPatch, isObjectLike, isVehicleLike, pickLock, pickObject, rgbaToGray, trackPatch } from "./motion";
 import { assumedSpanM, lookupWheelbase } from "./wheelbase";
 import { FlowTracker, flowSpeedMps } from "./optical-flow";
 import {
@@ -305,7 +305,13 @@ export function useVeloxEngine(refs: EngineRefs) {
         const gray = new Uint8Array(ANALYSIS_W * ANALYSIS_H);
         rgbaToGray(img.data, gray);
         if (prevGray) {
-          const found = findMovingRegions(prevGray, gray, ANALYSIS_W, ANALYSIS_H);
+          const found = findMovingRegions(
+            prevGray,
+            gray,
+            ANALYSIS_W,
+            ANALYSIS_H,
+            disparo ? "object" : "vehicle",
+          );
           const fr = flow.push(img, dt);
           const sx = canvasW / ANALYSIS_W;
           const sy = canvasH / ANALYSIS_H;
@@ -342,16 +348,16 @@ export function useVeloxEngine(refs: EngineRefs) {
             const hit = near[0] && near[0].d < (ANALYSIS_W * 0.22) ** 2 ? near[0].b : null;
             chosen =
               hit ?? {
-                x: Math.max(0, ax - ANALYSIS_W * 0.1),
-                y: Math.max(0, ay - ANALYSIS_H * 0.05),
-                w: ANALYSIS_W * 0.2,
-                h: ANALYSIS_H * 0.1,
+                x: Math.max(0, ax - ANALYSIS_W * (disparo ? 0.07 : 0.1)),
+                y: Math.max(0, ay - ANALYSIS_H * (disparo ? 0.11 : 0.05)),
+                w: ANALYSIS_W * (disparo ? 0.14 : 0.2),
+                h: ANALYSIS_H * (disparo ? 0.22 : 0.1),
                 score: 1e6,
               };
           } else if (tmpl && tmplBox) {
             const moved = trackPatch(gray, tmpl, tmplW, tmplH, ANALYSIS_W, ANALYSIS_H, tmplBox);
             const alt = disparo
-              ? null
+              ? pickObject(sized, ANALYSIS_W, ANALYSIS_H, moved)
               : pickLock(sized, ANALYSIS_W, ANALYSIS_H, null, moved, null);
             if (moved) {
               const tcx = moved.x + moved.w / 2;
@@ -371,16 +377,26 @@ export function useVeloxEngine(refs: EngineRefs) {
                 : isVehicleLike(canvasMoved, canvasW, canvasH);
               const altLike =
                 alt != null &&
-                isVehicleLike(
-                  { x: alt.x * sx, y: alt.y * sy, w: alt.w * sx, h: alt.h * sy },
-                  canvasW,
-                  canvasH,
-                );
+                (disparo
+                  ? isObjectLike(
+                      { x: alt.x * sx, y: alt.y * sy, w: alt.w * sx, h: alt.h * sy },
+                      canvasW,
+                      canvasH,
+                    )
+                  : isVehicleLike(
+                      { x: alt.x * sx, y: alt.y * sy, w: alt.w * sx, h: alt.h * sy },
+                      canvasW,
+                      canvasH,
+                    ));
+              const movedAspect = moved.w / Math.max(1, moved.h);
+              const altAspect = alt ? alt.w / Math.max(1, alt.h) : 99;
               const steal =
                 alt != null &&
                 altLike &&
                 boxIou(moved, alt) < 0.12 &&
-                (!like || stillFrames > 8);
+                (!like ||
+                  stillFrames > 8 ||
+                  (disparo && altAspect <= 1.2 && movedAspect > 1.6));
               if (steal && alt) {
                 tmpl = null;
                 tmplBox = null;
@@ -424,7 +440,24 @@ export function useVeloxEngine(refs: EngineRefs) {
           } else if (disparo && now < quietUntil) {
             chosen = null;
           } else {
-            chosen = pickLock(sized, ANALYSIS_W, ANALYSIS_H, lastLockId, lastBox
+            chosen = disparo
+              ? pickObject(
+                  sized,
+                  ANALYSIS_W,
+                  ANALYSIS_H,
+                  lastBox
+                    ? {
+                        x: lastBox.x / sx,
+                        y: lastBox.y / sy,
+                        w: lastBox.w / sx,
+                        h: lastBox.h / sy,
+                      }
+                    : null,
+                  pendingAim
+                    ? { x: pendingAim.nx * ANALYSIS_W, y: pendingAim.ny * ANALYSIS_H }
+                    : null,
+                )
+              : pickLock(sized, ANALYSIS_W, ANALYSIS_H, lastLockId, lastBox
               ? {
                   x: lastBox.x / sx,
                   y: lastBox.y / sy,
@@ -442,8 +475,9 @@ export function useVeloxEngine(refs: EngineRefs) {
               }
             : null;
           const f = canvasW / 2 / Math.tan(HFOV / 2);
+          const spanM = disparo ? 0.55 : settings.assumedWidthM;
           const distGuess = bbox
-            ? (settings.assumedWidthM * f) / Math.max(8, bbox.w)
+            ? (spanM * f) / Math.max(8, bbox.w)
             : 0;
           const vehicle =
             bbox &&
@@ -461,7 +495,9 @@ export function useVeloxEngine(refs: EngineRefs) {
             const wb =
               ident?.wheelbaseM ??
               (ident ? lookupWheelbase(ident.make, ident.model, ident.klass) : null);
-            const span = assumedSpanM(filtered, settings.assumedWidthM, wb);
+            const span = disparo
+              ? 0.55
+              : assumedSpanM(filtered, settings.assumedWidthM, wb);
             const flowV = flowSpeedMps(
               fr.vectors,
               chosen,
