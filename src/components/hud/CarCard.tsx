@@ -1,5 +1,6 @@
 import type { LockedTarget, VehicleId } from "@/lib/speed/types";
 import { formatDistance, formatSpeed, speedUnit } from "@/lib/speed/format";
+import { gammaById, matchCatalog } from "@/lib/speed/catalog";
 import { useVelox } from "@/lib/speed/store";
 
 export function CarCard({
@@ -12,6 +13,8 @@ export function CarCard({
   const units = useVelox((s) => s.settings.units);
   const status = useVelox((s) => s.identifyStatus);
   const err = useVelox((s) => s.identifyError);
+  const hit = id ? matchCatalog(id.make, id.model) : undefined;
+  const gamma = hit ? gammaById(hit.gamma) : null;
 
   if (!lock && !id) return null;
 
@@ -23,13 +26,17 @@ export function CarCard({
     >
       {id ? (
         <>
-          <p className="hud-kicker text-faint">Ficha</p>
+          <p className="hud-kicker text-faint">
+            Ficha
+            {gamma ? ` · ${gamma.name}` : ""}
+          </p>
           <p className="font-condensed mt-0.5 text-lg leading-none font-semibold tracking-wide text-fg sm:text-xl">
             {id.make} {id.model}
           </p>
           <p className="mt-1 text-xs text-muted">
             {id.year}
             {id.color ? ` · ${id.color}` : ""}
+            {gamma ? ` · ${gamma.rarity}` : ""}
             {lock ? ` · ${formatSpeed(lock.speedMps, units)} ${speedUnit(units)}` : ""}
           </p>
           <p className="mt-1.5 text-sm leading-snug text-pretty text-fg">{id.description}</p>

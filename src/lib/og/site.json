@@ -3,5 +3,5 @@
   "type": "x:game",
   "card": "custom",
   "color": "08090b",
-  "description": "Point your phone at a car. VELOX reads its speed, IDs the make and files a short AI fact."
+  "description": "Point at a car: VELOX reads its speed, IDs it, and unlocks it in a rarity catalog of gammas."
 }

@@ -29,7 +29,7 @@ export function seedCars(): SimCar[] {
   return FLEET.map((f, i) => ({
     id: `sim-${f.id}`,
     fleetId: f.id,
-    z: 20 + i * 11,
+    z: 18 + i * 8,
     lane: LANES[i % 2]!,
     speedMps: 6.2 + (i % 4) * 1.15 + (i % 2) * 0.4,
   }));

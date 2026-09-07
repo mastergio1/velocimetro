@@ -1,9 +1,18 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
+import { useVelox } from "@/lib/speed/store";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "VELOX";
+
+function HydrateVelox() {
+  useEffect(() => {
+    useVelox.getState().hydrate();
+  }, []);
+  return null;
+}
 
 export const Route = createRootRoute({
   head: () => ({
@@ -44,6 +53,7 @@ export const Route = createRootRoute({
       </head>
       <body className="bg-bg text-fg font-sans">
         <PreviewHostBridge />
+        <HydrateVelox />
         <AuthProvider>
           <Outlet />
         </AuthProvider>

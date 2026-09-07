@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, ScanSearch } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Camera, LayoutGrid, ScanSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnalogGauge } from "@/components/hud/AnalogGauge";
 import { CarCard } from "@/components/hud/CarCard";
@@ -46,6 +47,8 @@ export function VeloxApp() {
   const identifiedLockId = useVelox((s) => s.identifiedLockId);
   const identifyStatus = useVelox((s) => s.identifyStatus);
   const remember = useVelox((s) => s.remember);
+  const unlocks = useVelox((s) => s.unlocks);
+  const wilds = useVelox((s) => s.wilds);
 
   const [clock, setClock] = useState("--:--");
   useEffect(() => {
@@ -175,6 +178,14 @@ export function VeloxApp() {
             <span className="hud-kicker rounded-sm border border-line bg-surface/70 px-2 py-0.5 text-hud">
               {lock ? "BLOQUEADO" : "BUSCANDO"}
             </span>
+            <Link
+              to="/catalogo"
+              data-testid="catalog-link"
+              className="hud-kicker inline-flex min-h-8 items-center gap-1.5 rounded-sm border border-line/80 bg-bg/55 px-2 py-1 text-hud"
+            >
+              <LayoutGrid className="size-3.5" />
+              Catálogo {unlocks.length + wilds.length}
+            </Link>
           </div>
         </header>
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { Drawer } from "vaul";
-import { BookMarked } from "lucide-react";
+import { BookMarked, LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useVelox } from "@/lib/speed/store";
 
@@ -36,7 +37,8 @@ export function MemoryDrawer() {
               Memoria
             </Drawer.Title>
             <Drawer.Description className="mt-1 text-sm text-muted">
-              Marcas y modelos que ya identificaste en este teléfono.
+              Últimos análisis en este teléfono. El catálogo guarda el desbloqueo por
+              gamma.
             </Drawer.Description>
 
             <div className="mt-5 space-y-3">
@@ -65,6 +67,12 @@ export function MemoryDrawer() {
             </div>
 
             <div className="mt-6 space-y-2 pb-2">
+              <Button asChild variant="ghost" className="w-full">
+                <Link to="/catalogo" onClick={() => setOpen(false)}>
+                  <LayoutGrid />
+                  Abrir catálogo
+                </Link>
+              </Button>
               {memory.length > 0 ? (
                 <Button variant="ghost" className="w-full" onClick={() => clearMemory()}>
                   Vaciar memoria
