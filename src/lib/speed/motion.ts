@@ -17,13 +17,15 @@ export function insetBox(b: BBox, t = 0.14): BBox {
   return { x, y, w: Math.max(8, w), h: Math.max(8, h) };
 }
 
-export function lerpBox(a: BBox, b: BBox, t: number): BBox {
-  return {
-    x: a.x + (b.x - a.x) * t,
-    y: a.y + (b.y - a.y) * t,
-    w: a.w + (b.w - a.w) * t,
-    h: a.h + (b.h - a.h) * t,
-  };
+export function isVehicleLike(b: BBox, frameW: number, frameH: number, distM?: number): boolean {
+  const aspect = b.w / Math.max(1, b.h);
+  if (aspect < 1.2 || aspect > 3.2) return false;
+  if (b.h > frameH * 0.28) return false;
+  if (b.w > frameW * 0.7) return false;
+  const cy = b.y + b.h / 2;
+  if (cy < frameH * 0.34 || cy > frameH * 0.72) return false;
+  if (distM != null && (distM < 8 || distM > 120)) return false;
+  return true;
 }
 
 export function findMovingRegions(
@@ -40,7 +42,7 @@ export function findMovingRegions(
 
   for (let y = 0; y < height; y++) {
     const gy = Math.min(gh - 1, Math.floor(y / cellH));
-    if (gy < gh * 0.28 || gy > gh * 0.9) continue;
+    if (gy < gh * 0.3 || gy > gh * 0.78) continue;
     const row = y * width;
     for (let x = 0; x < width; x++) {
       const d = Math.abs((next[row + x] ?? 0) - (prev[row + x] ?? 0));
@@ -97,7 +99,7 @@ export function findMovingRegions(
       const bh = r.maxY - r.minY + 1;
       if (bw < 3 || bh < 2) continue;
       const aspect = bw / bh;
-      if (aspect < 1.05 || aspect > 3.1) continue;
+      if (aspect < 1.2 || aspect > 3.0) continue;
       const raw = {
         x: (r.minX / gw) * width,
         y: (r.minY / gh) * height,
@@ -105,9 +107,10 @@ export function findMovingRegions(
         h: (bh / gh) * height,
       };
       const area = raw.w * raw.h;
-      if (area < frameA * 0.016 || area > frameA * 0.3) continue;
+      if (area < frameA * 0.014 || area > frameA * 0.18) continue;
+      if (raw.h > height * 0.26) continue;
       const cy = raw.y + raw.h / 2;
-      if (cy < height * 0.34) continue;
+      if (cy < height * 0.36 || cy > height * 0.7) continue;
       const tight = insetBox(raw, 0.13);
       boxes.push({ ...tight, score: r.mass });
     }

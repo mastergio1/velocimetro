@@ -4,7 +4,7 @@ import { attachStream, cameraErrorMessage, openCamera } from "./camera";
 import { fleetById } from "./catalog";
 import { requestMotionPermission } from "./gps";
 import { BoxKalman } from "./kalman";
-import { findMovingRegions, pickLock, rgbaToGray } from "./motion";
+import { findMovingRegions, isVehicleLike, pickLock, rgbaToGray } from "./motion";
 import { assumedSpanM, lookupWheelbase } from "./wheelbase";
 import { FlowTracker, flowSpeedMps } from "./optical-flow";
 import {
@@ -300,23 +300,30 @@ export function useVeloxEngine(refs: EngineRefs) {
                 }
               : null,
           );
-          if (chosen) {
-            const bbox = {
-              x: chosen.x * sx,
-              y: chosen.y * sy,
-              w: chosen.w * sx,
-              h: chosen.h * sy,
-            };
+          const bbox = chosen
+            ? {
+                x: chosen.x * sx,
+                y: chosen.y * sy,
+                w: chosen.w * sx,
+                h: chosen.h * sy,
+              }
+            : null;
+          const f = canvasW / 2 / Math.tan(HFOV / 2);
+          const distGuess = bbox
+            ? (settings.assumedWidthM * f) / Math.max(8, bbox.w)
+            : 0;
+          const vehicle =
+            bbox && isVehicleLike(bbox, canvasW, canvasH, distGuess) ? bbox : null;
+
+          if (vehicle && chosen) {
             kf.predict(dt);
-            kf.update(bbox, dt);
+            kf.update(vehicle, dt);
             const filtered = kf.box();
             const ident = store.identification;
             const wb =
               ident?.wheelbaseM ??
               (ident ? lookupWheelbase(ident.make, ident.model, ident.klass) : null);
             const span = assumedSpanM(filtered, settings.assumedWidthM, wb);
-            const distGuess =
-              (span * (canvasW / 2 / Math.tan(HFOV / 2))) / Math.max(8, filtered.w);
             const flowV = flowSpeedMps(
               fr.vectors,
               chosen,
@@ -343,21 +350,17 @@ export function useVeloxEngine(refs: EngineRefs) {
               fleetId: null,
             };
             held = lock;
-            holdUntil = now + 820;
-          } else if (kf.inited && kf.misses < 16) {
+            holdUntil = now + 420;
+          } else if (kf.inited && kf.misses < 6) {
             kf.predict(dt);
             lock = {
               id: "live",
               bbox: kf.coast(),
-              speedMps: range.speedMps,
+              speedMps: range.speedMps * 0.85,
               distanceM: range.distanceM,
-              confidence: range.confidence * 0.85,
+              confidence: range.confidence * 0.5,
               fleetId: null,
             };
-            held = lock;
-            holdUntil = now + 820;
-          } else if (held && now < holdUntil) {
-            lock = held;
           } else {
             range.reset();
             kf.reset();

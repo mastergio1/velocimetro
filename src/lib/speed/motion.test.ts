@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { pickLock, type MotionBox } from "./motion.ts";
+import { pickLock, isVehicleLike, type MotionBox } from "./motion.ts";
 
 function box(x: number, y: number, w = 40, h = 24, score = 1): MotionBox {
   return { x, y, w, h, score };
@@ -24,5 +24,15 @@ describe("pickLock", () => {
     const far = box(220, 40, 80, 40, 200);
     const picked = pickLock([far, moved], 400, 220, "lock-1", prev);
     assert.equal(picked, moved);
+  });
+});
+
+describe("isVehicleLike", () => {
+  it("rejects a close pedestrian-sized box", () => {
+    assert.equal(isVehicleLike({ x: 80, y: 220, w: 90, h: 220 }, 390, 700, 5), false);
+  });
+
+  it("accepts a mid-road car box", () => {
+    assert.equal(isVehicleLike({ x: 120, y: 280, w: 110, h: 55 }, 390, 700, 18), true);
   });
 });
