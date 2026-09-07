@@ -39,4 +39,10 @@ describe("summarizePass", () => {
     assert.equal(summarizePass([0.1, 0.2]), null);
     assert.equal(summarizePass([4]), null);
   });
+
+  it("drops a pan spike so captura is not 72 on a tree", () => {
+    const s = summarizePass([0.8, 17.8, 11.4, 1.9, 3.6, 4.7, 1.1, 13.3, 4.4, 2.5, 6.4, 8.3, 15.8, 7.5]);
+    assert.ok(s);
+    assert.ok(s.peakMps < 12, `peak ${s.peakMps}`);
+  });
 });

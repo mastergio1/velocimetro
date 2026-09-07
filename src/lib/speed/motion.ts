@@ -29,7 +29,7 @@ export function isVehicleLike(b: BBox, frameW: number, frameH: number, distM?: n
   if (b.h > frameH * 0.4) return false;
   if (b.w > frameW * 0.46) return false;
   const cy = b.y + b.h / 2;
-  if (cy < frameH * 0.18 || cy > frameH * 0.78) return false;
+  if (cy < frameH * 0.3 || cy > frameH * 0.78) return false;
   if (distM != null && distM < 3.2) return false;
   return true;
 }

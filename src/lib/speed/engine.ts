@@ -205,6 +205,9 @@ export function useVeloxEngine(refs: EngineRefs) {
     let tmplBox: BBox | null = null;
     let tmplAge = 0;
     let tmplMiss = 0;
+    let stillFrames = 0;
+    let prevTcx = 0;
+    let prevTcy = 0;
     let passSamples: number[] = [];
     let shot: ShotResult | null = null;
     let quietUntil = 0;
@@ -326,6 +329,7 @@ export function useVeloxEngine(refs: EngineRefs) {
             tmpl = null;
             tmplBox = null;
             tmplMiss = 0;
+            stillFrames = 0;
             const ax = pendingAim.nx * ANALYSIS_W;
             const ay = pendingAim.ny * ANALYSIS_H;
             const near = sized
@@ -346,19 +350,70 @@ export function useVeloxEngine(refs: EngineRefs) {
               };
           } else if (tmpl && tmplBox) {
             const moved = trackPatch(gray, tmpl, tmplW, tmplH, ANALYSIS_W, ANALYSIS_H, tmplBox);
+            const alt = disparo
+              ? null
+              : pickLock(sized, ANALYSIS_W, ANALYSIS_H, null, moved, null);
             if (moved) {
-              tmplMiss = 0;
-              const overlap = sized.find((b) => boxIou(b, moved) > 0.12);
-              chosen = overlap
-                ? {
-                    x: moved.x * 0.7 + overlap.x * 0.3,
-                    y: moved.y * 0.7 + overlap.y * 0.3,
-                    w: moved.w * 0.75 + overlap.w * 0.25,
-                    h: moved.h * 0.75 + overlap.h * 0.25,
-                    score: 800,
-                  }
-                : { ...moved, score: 800 };
-              tmplBox = chosen;
+              const tcx = moved.x + moved.w / 2;
+              const tcy = moved.y + moved.h / 2;
+              if (Math.hypot(tcx - prevTcx, tcy - prevTcy) < 1.5) stillFrames++;
+              else stillFrames = 0;
+              prevTcx = tcx;
+              prevTcy = tcy;
+              const canvasMoved = {
+                x: moved.x * sx,
+                y: moved.y * sy,
+                w: moved.w * sx,
+                h: moved.h * sy,
+              };
+              const like = disparo
+                ? isObjectLike(canvasMoved, canvasW, canvasH)
+                : isVehicleLike(canvasMoved, canvasW, canvasH);
+              const altLike =
+                alt != null &&
+                isVehicleLike(
+                  { x: alt.x * sx, y: alt.y * sy, w: alt.w * sx, h: alt.h * sy },
+                  canvasW,
+                  canvasH,
+                );
+              const steal =
+                alt != null &&
+                altLike &&
+                boxIou(moved, alt) < 0.12 &&
+                (!like || stillFrames > 8);
+              if (steal && alt) {
+                tmpl = null;
+                tmplBox = null;
+                tmplMiss = 0;
+                stillFrames = 0;
+                passSamples = [];
+                range.reset();
+                kf.reset();
+                chosen = alt;
+              } else if (!like) {
+                tmplMiss++;
+                if (tmplMiss > 5) {
+                  tmpl = null;
+                  tmplBox = null;
+                  chosen = null;
+                } else {
+                  chosen = { ...moved, score: 400 };
+                  tmplBox = chosen;
+                }
+              } else {
+                tmplMiss = 0;
+                const overlap = sized.find((b) => boxIou(b, moved) > 0.12);
+                chosen = overlap
+                  ? {
+                      x: moved.x * 0.7 + overlap.x * 0.3,
+                      y: moved.y * 0.7 + overlap.y * 0.3,
+                      w: moved.w * 0.75 + overlap.w * 0.25,
+                      h: moved.h * 0.75 + overlap.h * 0.25,
+                      score: 800,
+                    }
+                  : { ...moved, score: 800 };
+                tmplBox = chosen;
+              }
             } else {
               tmplMiss++;
               if (tmplMiss > 14) {
