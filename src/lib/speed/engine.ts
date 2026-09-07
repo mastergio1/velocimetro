@@ -20,8 +20,8 @@ import { useVelox } from "./store";
 import { HFOV, RangeTracker } from "./tracker";
 import { HISTORY_LEN, type BBox, type LockedTarget } from "./types";
 
-const ANALYSIS_W = 240;
-const ANALYSIS_H = 135;
+const ANALYSIS_W = 320;
+const ANALYSIS_H = 180;
 
 export async function playDemo(video: HTMLVideoElement | null) {
   if (!video) return;
@@ -291,14 +291,7 @@ export function useVeloxEngine(refs: EngineRefs) {
                   h: lastBox.h / sy,
                 }
               : null,
-            settings.showGuide
-              ? {
-                  x: ANALYSIS_W * 0.1,
-                  y: ANALYSIS_H * 0.26,
-                  w: ANALYSIS_W * 0.8,
-                  h: ANALYSIS_H * 0.44,
-                }
-              : null,
+            null,
           );
           const bbox = chosen
             ? {
@@ -351,7 +344,7 @@ export function useVeloxEngine(refs: EngineRefs) {
             };
             held = lock;
             holdUntil = now + 420;
-          } else if (kf.inited && kf.misses < 6) {
+          } else if (kf.inited && kf.misses < 12) {
             kf.predict(dt);
             lock = {
               id: "live",
