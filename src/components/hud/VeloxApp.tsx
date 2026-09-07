@@ -183,84 +183,79 @@ export function VeloxApp() {
       />
       <canvas ref={analysisRef} className="hidden" width={240} height={135} />
 
-      <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-bg/40 via-transparent to-bg/75" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-linear-to-b from-bg/85 to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-linear-to-t from-bg via-bg/65 to-transparent" />
+      <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-bg/50 via-transparent to-bg/40" />
 
       <div className="hud-shell relative z-10 flex h-full flex-col">
-        <header className="flex items-start justify-between gap-3">
+        <header className="glass-dock flex items-center justify-between gap-3 rounded-md px-3 py-2">
           <div>
-            <p className="font-condensed text-2xl leading-none font-semibold tracking-[0.22em] text-fg">
+            <p className="font-condensed text-xl leading-none font-semibold tracking-[0.28em] text-fg">
               VELOX
             </p>
-            <p className="mt-1 text-xs tracking-[0.14em] text-muted uppercase">
-              Pistola de velocidad
-            </p>
+            <p className="hud-kicker mt-0.5 text-muted">Pistola</p>
           </div>
-          <div className="flex flex-col items-end gap-1.5">
-            <p className="text-sm tabular-nums text-hud">{clock}</p>
-            <span className="hud-kicker rounded-sm border border-line bg-surface/70 px-2 py-0.5 text-hud">
-              {lock ? "BLOQUEADO" : "BUSCANDO"}
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <span className="hud-chip tabular-nums text-hud">{clock}</span>
+            <span
+              className={cn(
+                "hud-chip",
+                lock ? "border-hud text-hud" : "text-muted",
+              )}
+            >
+              {lock ? "LOCK" : "SCAN"}
             </span>
-            {incognito ? (
-              <span className="hud-kicker rounded-sm border border-warn/50 bg-surface/70 px-2 py-0.5 text-warn">
-                INCÓGNITO
-              </span>
-            ) : null}
+            {over ? <span className="hud-chip border-danger text-danger">FAST</span> : null}
+            {incognito ? <span className="hud-chip border-warn text-warn">PRIV</span> : null}
             <Link
               to="/catalogo"
               data-testid="catalog-link"
-              className="hud-kicker inline-flex min-h-8 items-center gap-1.5 rounded-sm border border-line/80 bg-bg/55 px-2 py-1 text-hud"
+              className="hud-chip inline-flex min-h-8 items-center gap-1 text-hud"
             >
               <LayoutGrid className="size-3.5" />
-              Catálogo {collection.length}
+              {collection.length}
             </Link>
           </div>
         </header>
 
-        <p className="mt-2 text-center text-[11px] leading-snug text-muted sm:text-xs">
-          {channel === "demo"
-            ? "Cualquier iPhone, Android o tablet. Demo de calle: el retículo bloquea un auto y arma la ficha. Activa la cámara para medir de verdad."
-            : lock
-              ? "Quédate quieto y mantén el auto en el centro: se lee SU velocidad (no la tuya) y se arma la ficha."
-              : "Apunta a cualquier auto. Sirve en iPhone, Android y tablet — el teléfono quieto da la mejor medición."}
-        </p>
+        <div className="flex min-h-0 flex-1 flex-col justify-end">
+          {cameraError ? (
+            <p className="glass-dock mb-2 rounded-md px-3 py-2 text-xs text-danger">
+              {cameraError}
+            </p>
+          ) : !lock ? (
+            <p className="mb-2 text-center text-[11px] text-muted">
+              Apunta un auto y quédate quieto. Cualquier teléfono con cámara.
+            </p>
+          ) : null}
 
-        {cameraError ? (
-          <p className="mt-2 rounded-md border border-danger/40 bg-surface/80 px-3 py-2 text-xs text-danger">
-            {cameraError}
-          </p>
-        ) : null}
-
-        <div className="flex min-h-0 flex-1 flex-col justify-end overflow-y-auto">
-          <div className="mx-auto flex w-full max-w-lg flex-col items-center">
+          <div className="glass-dock mx-auto w-full max-w-lg rounded-lg px-3 pt-2 pb-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="hud-chip text-muted">{unit}</span>
+              <span className="hud-chip tabular-nums text-hud">
+                {dist ? `DIST ${dist.value}${dist.unit}` : "DIST —"}
+              </span>
+              <span className="hud-chip tabular-nums text-muted">
+                {lock ? `${Math.round(lock.confidence * 100)}%` : "0%"}
+              </span>
+            </div>
             <p
               className={cn(
-                "font-condensed hud-shadow text-speed leading-none font-bold tabular-nums",
-                over ? "text-danger" : "text-fg",
+                "font-condensed led-speed mt-1 text-center text-speed leading-none font-bold",
+                over ? "text-danger" : "text-hud",
               )}
             >
               {formatSpeed(speedMps, units)}
             </p>
-            <p className="mt-0.5 text-sm tracking-[0.28em] text-muted uppercase">{unit}</p>
             {over ? (
-              <p className="hud-kicker mt-0.5 text-danger">Exceso de límite</p>
+              <p className="hud-kicker mt-0.5 text-center text-danger">Exceso</p>
             ) : null}
-            <p className="mt-0.5 text-xs tabular-nums text-muted">
-              {dist ? `Dist ${dist.value} ${dist.unit}` : "Sin blanco"}
-              {lock ? ` · lock ${Math.round(lock.confidence * 100)}%` : ""}
-            </p>
-            <div className={cn("-mt-2 w-full", identification ? "max-w-sm" : "max-w-md")}>
+            <div className="-mt-3 mx-auto w-full max-w-sm">
               <AnalogGauge speedMps={speedMps} units={units} limitKmh={limitKmh} />
             </div>
-          </div>
-
-          <div className="mx-auto w-full max-w-lg space-y-2">
             {identification ? null : <Sparkline history={history} units={units} />}
             <CarCard id={identification} lock={lock} />
           </div>
 
-          <div className="mx-auto mt-3 flex w-full max-w-lg items-center gap-2 pb-1">
+          <div className="mx-auto mt-2 flex w-full max-w-lg items-center gap-2">
             <MemoryDrawer />
             <Button
               variant={cameraOn ? "default" : "hud"}

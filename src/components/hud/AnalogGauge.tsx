@@ -108,7 +108,7 @@ export function AnalogGauge({ speedMps, units, limitKmh }: Props) {
   return (
     <svg
       viewBox="0 0 400 230"
-      className="mx-auto h-auto w-full max-h-44 max-w-md min-[700px]:max-h-64"
+      className="mx-auto h-auto w-full max-h-32 max-w-sm min-[700px]:max-h-44"
       role="img"
       aria-label={`Velocímetro ${Math.round(raw)} de ${max}`}
     >

@@ -27,7 +27,7 @@ export function CarCard({
 
   return (
     <div
-      className="rounded-lg border border-line bg-surface/80 px-3 py-2.5"
+      className="mt-1 rounded-md border border-line/70 bg-bg/40 px-3 py-2"
       data-testid="car-card"
       data-has-ficha={id ? "1" : "0"}
     >
