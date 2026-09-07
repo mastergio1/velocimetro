@@ -213,25 +213,22 @@ export function VeloxApp() {
           <p className="mb-2 text-center text-xs text-muted">Apunta un auto. Quédate quieto.</p>
         ) : null}
 
-        <div className="mx-auto w-full max-w-lg">
-          <div className="flex items-end justify-between gap-3">
-            <p
-              className={cn(
-                "font-condensed led-speed text-speed leading-none font-bold",
-                over ? "text-danger" : "text-hud",
-              )}
-            >
-              {formatSpeed(speedMps, units)}
-            </p>
-            <div className="mb-1 flex flex-col items-end gap-1">
-              <span className="hud-chip text-hud">{unit}</span>
-              <span className="hud-chip tabular-nums text-hud">
-                {dist ? `DIST ${dist.value}${dist.unit}` : "DIST —"}
-              </span>
-            </div>
-          </div>
+        <div className="mx-auto w-full max-w-lg text-center">
+          <p
+            className={cn(
+              "font-condensed led-speed text-speed leading-none font-bold",
+              over ? "text-danger" : "text-hud",
+            )}
+          >
+            {formatSpeed(speedMps, units)}
+          </p>
+          <p className="hud-kicker mt-1 text-hud">
+            {unit}
+            {dist ? ` · DIST ${dist.value}${dist.unit}` : ""}
+            {over ? " · FAST" : ""}
+          </p>
           {identification || identifyStatus !== "idle" ? (
-            <div className="glass-dock mt-2 rounded-md px-3 py-2">
+            <div className="glass-dock mt-3 rounded-md px-3 py-2 text-left">
               <CarCard id={identification} lock={lock} />
             </div>
           ) : null}

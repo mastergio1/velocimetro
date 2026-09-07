@@ -386,18 +386,12 @@ export function useVeloxEngine(refs: EngineRefs) {
             drawBracket(oCtx, lock.bbox, "rgba(197, 212, 222, 0.95)");
             const ident = store.identification;
             const spec = lock.fleetId ? fleetById(lock.fleetId) : undefined;
-            const tagged =
-              ident != null &&
-              (store.identifiedLockId === lock.id ||
-                (lock.id === "live" && store.identifiedLockId === "live"))
-                ? ident
-                : null;
-            const title = tagged
-              ? `${tagged.make} ${tagged.model}`
-              : spec
+            if (!ident) {
+              const title = spec
                 ? `${spec.make} ${spec.model}`
                 : `${formatSpeed(lock.speedMps, settings.units)} ${speedUnit(settings.units)}`;
-            drawLockCaption(oCtx, lock.bbox, title, overlay.height);
+              drawLockCaption(oCtx, lock.bbox, title, overlay.height);
+            }
           }
           drawReticle(oCtx, overlay.width, overlay.height, !!lock);
         }

@@ -62,7 +62,7 @@ export const DEFAULT_SETTINGS: Settings = {
   assumedWidthM: 1.8,
   sensitivity: 1,
   speedLimitKmh: 120,
-  showBoxes: true,
+  showBoxes: false,
   incognito: false,
 };
 

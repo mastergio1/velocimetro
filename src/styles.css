@@ -24,7 +24,7 @@
   --radius-lg: 16px;
   --radius-xl: 24px;
 
-  --text-speed: clamp(3.4rem, 22vw, 7rem);
+  --text-speed: clamp(4.8rem, 28vw, 8rem);
   --text-cluster: clamp(0.7rem, 2.4vw, 0.85rem);
 
   --shadow-hud: 0 0 24px color-mix(in oklab, var(--color-bg) 70%, transparent);

@@ -43,7 +43,7 @@ export function CarCard({
         onClick={() => setOpen((v) => !v)}
       >
         <span>
-          <span className="hud-kicker text-hud">{gamma ? gamma.tag : "Ficha"}</span>
+          <span className="hud-kicker text-hud">{gamma ? gamma.name : "Ficha"}</span>
           <span className="font-condensed mt-0.5 block text-lg leading-none font-semibold text-fg">
             {id.make} {id.model}
           </span>
