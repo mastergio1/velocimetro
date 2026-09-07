@@ -4,7 +4,7 @@ import { attachStream, cameraErrorMessage, openCamera } from "./camera";
 import { fleetById } from "./catalog";
 import { requestMotionPermission } from "./gps";
 import { BoxKalman } from "./kalman";
-import { boxIou, findMovingRegions, grabPatch, isVehicleLike, pickLock, rgbaToGray, trackPatch } from "./motion";
+import { boxIou, findMovingRegions, grabPatch, isObjectLike, isVehicleLike, pickLock, rgbaToGray, trackPatch } from "./motion";
 import { assumedSpanM, lookupWheelbase } from "./wheelbase";
 import { FlowTracker, flowSpeedMps } from "./optical-flow";
 import {
@@ -18,7 +18,8 @@ import {
 import { redactPlatesFromImageData } from "./plates";
 import { useVelox } from "./store";
 import { HFOV, RangeTracker } from "./tracker";
-import { HISTORY_LEN, type BBox, type LockedTarget } from "./types";
+import { HISTORY_LEN, type BBox, type LockedTarget, type ShotResult } from "./types";
+import { summarizePass } from "./format";
 
 const ANALYSIS_W = 320;
 const ANALYSIS_H = 180;
@@ -204,6 +205,10 @@ export function useVeloxEngine(refs: EngineRefs) {
     let tmplBox: BBox | null = null;
     let tmplAge = 0;
     let tmplMiss = 0;
+    let passSamples: number[] = [];
+    let shot: ShotResult | null = null;
+    let quietUntil = 0;
+    let lastMode = useVelox.getState().settings.gunMode;
 
     const analysis = refsRef.current.analysisRef.current;
     if (analysis) {
@@ -216,6 +221,19 @@ export function useVeloxEngine(refs: EngineRefs) {
       last = now;
       const store = useVelox.getState();
       const { settings } = store;
+      if (lastMode !== settings.gunMode) {
+        lastMode = settings.gunMode;
+        tmpl = null;
+        tmplBox = null;
+        tmplMiss = 0;
+        passSamples = [];
+        shot = null;
+        quietUntil = 0;
+        range.reset();
+        kf.reset();
+        held = null;
+      }
+      const disparo = settings.gunMode === "disparo";
       const { videoRef, simRef, overlayRef, analysisRef } = refsRef.current;
       const video = videoRef.current;
       const sim = simRef.current;
@@ -295,8 +313,14 @@ export function useVeloxEngine(refs: EngineRefs) {
             raw: b,
           }));
           for (const m of mapped) boxes.push({ id: m.id, bbox: m.bbox });
-          const sized = found.filter((b) => b.w < ANALYSIS_W * 0.44 && b.h < ANALYSIS_H * 0.36);
+          const sized = found.filter(
+            (b) => b.w < ANALYSIS_W * 0.44 && b.h < ANALYSIS_H * (disparo ? 0.5 : 0.36),
+          );
           const freshTap = pendingAim != null && now - pendingAim.at < 220;
+          if (freshTap) {
+            shot = null;
+            quietUntil = 0;
+          }
           let chosen: (typeof found)[number] | null = null;
           if (freshTap && pendingAim) {
             tmpl = null;
@@ -342,6 +366,8 @@ export function useVeloxEngine(refs: EngineRefs) {
                 tmplBox = null;
               }
             }
+          } else if (disparo && now < quietUntil) {
+            chosen = null;
           } else {
             chosen = pickLock(sized, ANALYSIS_W, ANALYSIS_H, lastLockId, lastBox
               ? {
@@ -365,7 +391,10 @@ export function useVeloxEngine(refs: EngineRefs) {
             ? (settings.assumedWidthM * f) / Math.max(8, bbox.w)
             : 0;
           const vehicle =
-            bbox && (freshTap || tmpl != null || isVehicleLike(bbox, canvasW, canvasH, distGuess))
+            bbox &&
+            (freshTap ||
+              tmpl != null ||
+              (disparo ? isObjectLike(bbox, canvasW, canvasH) : isVehicleLike(bbox, canvasW, canvasH, distGuess)))
               ? bbox
               : null;
 
@@ -450,13 +479,33 @@ export function useVeloxEngine(refs: EngineRefs) {
       }
 
       lastLockId = lock?.id ?? null;
+      const lost = lastBox != null && !lock;
       lastBox = lock?.bbox ?? null;
       lastDist = lock?.distanceM ?? lastDist;
 
-      const target = lock?.speedMps ?? 0;
-      displayMps = displayMps * 0.55 + target * 0.45;
-      if (!lock) displayMps *= 0.9;
-      if (displayMps < 0.2) displayMps = 0;
+      if (lock && range.speedMps > 0.35) {
+        passSamples.push(range.speedMps);
+        if (passSamples.length > 48) passSamples.shift();
+        shot = null;
+      } else if (lost) {
+        const sum = summarizePass(passSamples);
+        passSamples = [];
+        if (sum) {
+          shot = { ...sum, until: now + 2000 };
+          if (disparo) quietUntil = now + 2000;
+        }
+      }
+      if (shot && now >= shot.until) shot = null;
+
+      const showingShot = !lock && shot != null;
+      if (showingShot && shot) {
+        displayMps = shot.peakMps;
+      } else {
+        const target = lock?.speedMps ?? 0;
+        displayMps = displayMps * 0.55 + target * 0.45;
+        if (!lock) displayMps *= 0.9;
+        if (displayMps < 0.2) displayMps = 0;
+      }
 
       let history = store.history;
       if (now - lastHistory > 140) {
@@ -494,11 +543,12 @@ export function useVeloxEngine(refs: EngineRefs) {
 
       useVelox.setState({
         speedMps: displayMps,
-        instantMps: target,
+        instantMps: lock?.speedMps ?? (shot && !lock ? shot.peakMps : 0),
         history,
         activeChannel: channel,
         lock,
         boxes,
+        shot,
       });
 
       raf = requestAnimationFrame(tick);

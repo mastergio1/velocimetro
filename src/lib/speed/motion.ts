@@ -34,6 +34,15 @@ export function isVehicleLike(b: BBox, frameW: number, frameH: number, distM?: n
   return true;
 }
 
+export function isObjectLike(b: BBox, frameW: number, frameH: number): boolean {
+  const area = (b.w * b.h) / Math.max(1, frameW * frameH);
+  if (area < 0.003 || area > 0.42) return false;
+  if (b.w > frameW * 0.55 || b.h > frameH * 0.58) return false;
+  const cy = b.y + b.h / 2;
+  if (cy < frameH * 0.14 || cy > frameH * 0.88) return false;
+  return true;
+}
+
 export function findMovingRegions(
   prev: Uint8Array,
   next: Uint8Array,

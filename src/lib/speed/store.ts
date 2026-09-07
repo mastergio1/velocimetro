@@ -46,6 +46,7 @@ function loadSettings(): Settings {
       showGuide: parsed.showGuide === false ? false : true,
       highFps: parsed.highFps === false ? false : true,
       incognito: parsed.incognito === true,
+      gunMode: parsed.gunMode === "disparo" ? "disparo" : "pista",
     };
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -188,6 +189,7 @@ const initialLive: LiveState = {
   identifyError: null,
   identifyCount: 0,
   memory: [],
+  shot: null,
 };
 
 type VeloxStore = LiveState & {

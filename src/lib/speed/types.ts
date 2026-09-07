@@ -1,5 +1,6 @@
 export type Units = "kmh" | "mph";
 export type CameraFacing = "environment" | "user";
+export type GunMode = "pista" | "disparo";
 
 export type Settings = {
   units: Units;
@@ -11,6 +12,7 @@ export type Settings = {
   showGuide: boolean;
   highFps: boolean;
   incognito: boolean;
+  gunMode: GunMode;
 };
 
 export type BBox = { x: number; y: number; w: number; h: number };
@@ -41,6 +43,13 @@ export type LockedTarget = {
   fleetId: string | null;
 };
 
+export type ShotResult = {
+  lastMps: number;
+  peakMps: number;
+  meanMps: number;
+  until: number;
+};
+
 export type LiveState = {
   speedMps: number;
   instantMps: number;
@@ -57,6 +66,7 @@ export type LiveState = {
   identifyError: string | null;
   identifyCount: number;
   memory: MemoryEntry[];
+  shot: ShotResult | null;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -69,6 +79,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showGuide: true,
   highFps: true,
   incognito: false,
+  gunMode: "pista",
 };
 
 export const HISTORY_LEN = 96;

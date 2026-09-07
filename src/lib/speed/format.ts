@@ -125,3 +125,21 @@ export function limitInDisplay(limitKmh: number, units: Units): number {
   if (units === "mph") return limitKmh * 0.621371;
   return limitKmh;
 }
+
+export function summarizePass(samples: number[]): {
+  lastMps: number;
+  peakMps: number;
+  meanMps: number;
+} | null {
+  const xs = samples.filter((s) => Number.isFinite(s) && s > 0.35);
+  if (xs.length < 2) return null;
+  const last = xs[xs.length - 1]!;
+  let peak = last;
+  let sum = 0;
+  for (const s of xs) {
+    if (s > peak) peak = s;
+    sum += s;
+  }
+  if (peak < 0.7) return null;
+  return { lastMps: last, peakMps: peak, meanMps: sum / xs.length };
+}

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { pickLock, isVehicleLike, findMovingRegions, grabPatch, trackPatch, type MotionBox } from "./motion.ts";
+import { pickLock, isVehicleLike, isObjectLike, findMovingRegions, grabPatch, trackPatch, type MotionBox } from "./motion.ts";
 
 function box(x: number, y: number, w = 40, h = 24, score = 1): MotionBox {
   return { x, y, w, h, score };
@@ -48,6 +48,16 @@ describe("isVehicleLike", () => {
 
   it("accepts a mid-road car box", () => {
     assert.equal(isVehicleLike({ x: 120, y: 280, w: 110, h: 55 }, 390, 700, 18), true);
+  });
+});
+
+describe("isObjectLike", () => {
+  it("accepts a bicycle-sized box that cars would skip", () => {
+    assert.equal(isObjectLike({ x: 160, y: 260, w: 40, h: 90 }, 390, 700), true);
+  });
+
+  it("rejects a mural-sized blob", () => {
+    assert.equal(isObjectLike({ x: 10, y: 40, w: 360, h: 500 }, 390, 700), false);
   });
 });
 

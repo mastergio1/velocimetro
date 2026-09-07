@@ -48,6 +48,9 @@ export function VeloxApp() {
   const remember = useVelox((s) => s.remember);
   const collection = useVelox((s) => s.collection);
   const incognito = useVelox((s) => s.settings.incognito);
+  const gunMode = useVelox((s) => s.settings.gunMode);
+  const setSettings = useVelox((s) => s.setSettings);
+  const shot = useVelox((s) => s.shot);
 
   const [clock, setClock] = useState("--:--");
   const [openingCam, setOpeningCam] = useState(false);
@@ -82,11 +85,12 @@ export function VeloxApp() {
 
   const display = toDisplaySpeed(speedMps, units);
   const limit = limitInDisplay(limitKmh, units);
-  const over = display >= limit && speedMps > 1;
-  const near = !over && display >= limit * 0.85 && speedMps > 1;
+  const showingShot = !lock && shot != null;
+  const over = display >= limit && speedMps > 1 && !showingShot;
+  const near = !over && display >= limit * 0.85 && speedMps > 1 && !showingShot;
   const unit = speedUnit(units);
   const dist = lock ? formatDistance(lock.distanceM, units) : null;
-  const needsAi = channel === "camera" && !!lock && identifiedLockId !== lock.id;
+  const needsAi = channel === "camera" && gunMode === "pista" && !!lock && identifiedLockId !== lock.id;
 
   async function onIdentify() {
     const live = useVelox.getState();
@@ -151,13 +155,14 @@ export function VeloxApp() {
 
   useEffect(() => {
     if (channel !== "camera") return;
+    if (gunMode === "disparo") return;
     if (!lock || identifiedLockId === lock.id) return;
     if (identifyStatus !== "idle") return;
     const timer = window.setTimeout(() => {
       void identifyRef.current();
     }, 1100);
     return () => window.clearTimeout(timer);
-  }, [channel, lock?.id, identifiedLockId, identifyStatus]);
+  }, [channel, lock?.id, identifiedLockId, identifyStatus, gunMode]);
 
   return (
     <main
@@ -196,13 +201,33 @@ export function VeloxApp() {
           </p>
           <div className="flex flex-wrap items-center justify-end gap-1.5">
             <span className="hud-chip tabular-nums text-hud">{clock}</span>
+            <div className="flex overflow-hidden rounded-md border border-line">
+              {(
+                [
+                  ["pista", "Pista"],
+                  ["disparo", "Disparo"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={cn(
+                    "hud-chip rounded-none border-0 px-2 py-1",
+                    gunMode === id ? "hud-chip-lock" : "text-muted",
+                  )}
+                  onClick={() => setSettings({ gunMode: id })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <span
               className={cn(
                 "hud-chip",
-                lock ? "hud-chip-lock" : "text-muted",
+                showingShot ? "hud-chip-lock" : lock ? "hud-chip-lock" : "text-muted",
               )}
             >
-              {lock ? "LOCK" : "SCAN"}
+              {showingShot ? "CAPTURA" : lock ? "LOCK" : "SCAN"}
             </span>
             {over ? <span className="hud-chip hud-chip-fast">FAST</span> : null}
             {incognito ? <span className="hud-chip border-warn text-warn">PRIV</span> : null}
@@ -221,9 +246,13 @@ export function VeloxApp() {
 
         {cameraError ? (
           <p className="glass-dock mb-2 rounded-md px-3 py-2 text-xs text-danger">{cameraError}</p>
+        ) : showingShot ? (
+          <p className="mb-2 text-center text-xs text-hud">Listo — toca otro blanco.</p>
         ) : !lock ? (
           <p className="mb-2 text-center text-xs text-muted">
-            Apunta un auto y tócalo para fijar el lock.
+            {gunMode === "disparo"
+              ? "Apunta el objeto. Al perderlo, congela la velocidad."
+              : "Apunta un auto y tócalo para fijar el lock."}
           </p>
         ) : null}
 
@@ -231,15 +260,21 @@ export function VeloxApp() {
           <p
             className={cn(
               "font-condensed led-speed text-speed leading-none font-bold",
-              over ? "led-fast text-danger" : near ? "text-warn" : lock ? "led-lock text-hud" : "text-hud",
+              over
+                ? "led-fast text-danger"
+                : near
+                  ? "text-warn"
+                  : showingShot || lock
+                    ? "led-lock text-hud"
+                    : "text-hud",
             )}
           >
             {formatSpeed(speedMps, units)}
           </p>
           <p className={cn("hud-kicker mt-1", over ? "text-danger" : "text-hud")}>
-            {unit}
-            {dist ? ` · DIST ${dist.value}${dist.unit}` : ""}
-            {over ? " · EXCESO" : near ? " · LÍMITE" : ""}
+            {showingShot && shot
+              ? `CAPTURA · MEDIA ${formatSpeed(shot.meanMps, units)} ${unit}`
+              : `${unit}${dist ? ` · DIST ${dist.value}${dist.unit}` : ""}${over ? " · EXCESO" : near ? " · LÍMITE" : ""}`}
           </p>
           {identification ? (
             <div className="glass-dock mt-3 rounded-md px-3 py-2 text-left">
