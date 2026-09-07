@@ -31,6 +31,7 @@ export async function playDemo(video: HTMLVideoElement | null) {
   }
   video.loop = true;
   video.muted = true;
+  video.defaultMuted = true;
   video.autoplay = true;
   video.playsInline = true;
   video.setAttribute("playsinline", "true");
@@ -38,11 +39,19 @@ export async function playDemo(video: HTMLVideoElement | null) {
   if (!video.getAttribute("src")?.includes("night.mp4")) {
     video.src = DEMO_SRC;
   }
+  const markReady = () => useVelox.setState({ cameraReady: true, cameraError: null });
+  video.onplaying = markReady;
   try {
     await video.play();
-    useVelox.setState({ cameraReady: true, cameraError: null });
+    markReady();
   } catch {
-    useVelox.setState({ cameraReady: false });
+    video.addEventListener(
+      "canplay",
+      () => {
+        void video.play().then(markReady).catch(() => undefined);
+      },
+      { once: true },
+    );
   }
 }
 
@@ -165,10 +174,7 @@ export function useVeloxEngine(refs: EngineRefs) {
   useEffect(() => {
     if (cameraOn) return;
     const video = refsRef.current.videoRef.current;
-    const t = window.setTimeout(() => {
-      void playDemo(video);
-    }, 450);
-    return () => window.clearTimeout(t);
+    void playDemo(video);
   }, [cameraOn]);
 
   useEffect(() => {

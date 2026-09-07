@@ -165,23 +165,16 @@ export function VeloxApp() {
     >
       <video
         ref={videoRef}
-        className={cn(
-          "absolute inset-0 size-full object-cover",
-          cameraReady ? "opacity-100" : "opacity-0",
-        )}
+        className="absolute inset-0 size-full object-cover"
+        src="/demo/night.mp4"
         poster="/demo/night.jpg"
-        preload="none"
+        preload="auto"
+        autoPlay
         loop
-        playsInline
         muted
+        playsInline
       />
-      <canvas
-        ref={simRef}
-        className={cn(
-          "absolute inset-0 size-full",
-          cameraReady ? "opacity-0" : "opacity-100",
-        )}
-      />
+      <canvas ref={simRef} className="pointer-events-none absolute inset-0 size-full opacity-0" />
       <canvas
         ref={overlayRef}
         className="pointer-events-none absolute inset-0 size-full"
