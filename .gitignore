@@ -1,0 +1,15 @@
+node_modules
+.vercel
+.tanstack
+.output
+dist
+coverage
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+screenshots
+artifacts
+.project_id
+.node_modules.lock
