@@ -28,4 +28,11 @@ describe("RangeTracker", () => {
     t.push({ x: 160, y: 90, w: 86, h: 36 }, 400, 1.8, 1, 240, 28, 0.8);
     assert.ok(t.speedMps > 5, `flow should lift speed, got ${t.speedMps}`);
   });
+
+  it("reports speed after two lateral samples", () => {
+    const t = new RangeTracker();
+    t.push({ x: 70, y: 100, w: 60, h: 28 }, 400, 1.8, 1, 0);
+    t.push({ x: 150, y: 100, w: 60, h: 28 }, 400, 1.8, 1, 120);
+    assert.ok(t.speedMps > 2, `expected lateral speed, got ${t.speedMps}`);
+  });
 });

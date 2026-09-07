@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { pickLock, isVehicleLike, type MotionBox } from "./motion.ts";
+import { pickLock, isVehicleLike, findMovingRegions, type MotionBox } from "./motion.ts";
 
 function box(x: number, y: number, w = 40, h = 24, score = 1): MotionBox {
   return { x, y, w, h, score };
@@ -25,6 +25,12 @@ describe("pickLock", () => {
     const picked = pickLock([far, moved], 400, 220, "lock-1", prev);
     assert.equal(picked, moved);
   });
+
+  it("prefers a road-band car over tree flicker", () => {
+    const tree = box(200, 8, 90, 40, 900);
+    const car = box(140, 90, 70, 28, 200);
+    assert.equal(pickLock([tree, car], 400, 220, null, null), car);
+  });
 });
 
 describe("isVehicleLike", () => {
@@ -38,5 +44,25 @@ describe("isVehicleLike", () => {
 
   it("accepts a mid-road car box", () => {
     assert.equal(isVehicleLike({ x: 120, y: 280, w: 110, h: 55 }, 390, 700, 18), true);
+  });
+});
+
+describe("findMovingRegions", () => {
+  it("finds a translating rectangle on the road band", () => {
+    const w = 160;
+    const h = 90;
+    const a = new Uint8Array(w * h).fill(30);
+    const b = new Uint8Array(w * h).fill(30);
+    const paint = (buf: Uint8Array, x0: number, y0: number) => {
+      for (let y = y0; y < y0 + 16; y++) {
+        for (let x = x0; x < x0 + 44; x++) buf[y * w + x] = 210;
+      }
+    };
+    paint(a, 18, 36);
+    paint(b, 40, 36);
+    const boxes = findMovingRegions(a, b, w, h);
+    assert.ok(boxes.length >= 1, "expected a motion blob");
+    const cy = boxes[0]!.y + boxes[0]!.h / 2;
+    assert.ok(cy > h * 0.28 && cy < h * 0.65, `cy ${cy}`);
   });
 });

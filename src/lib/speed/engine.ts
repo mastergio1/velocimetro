@@ -23,6 +23,17 @@ import { HISTORY_LEN, type BBox, type LockedTarget } from "./types";
 const ANALYSIS_W = 320;
 const ANALYSIS_H = 180;
 
+let pendingAim: { nx: number; ny: number; at: number } | null = null;
+
+/** Tap on the live view (normalized 0–1) to pin the lock on a car. */
+export function aimAt(nx: number, ny: number) {
+  pendingAim = {
+    nx: Math.min(1, Math.max(0, nx)),
+    ny: Math.min(1, Math.max(0, ny)),
+    at: performance.now(),
+  };
+}
+
 export async function playDemo(video: HTMLVideoElement | null) {
   if (!video) return;
   const leftover = video.srcObject;
@@ -78,7 +89,7 @@ function resizeCanvas(canvas: HTMLCanvasElement, cssW: number, cssH: number, dpr
 }
 
 function guideRect(w: number, h: number): BBox {
-  return { x: w * 0.1, y: h * 0.26, w: w * 0.8, h: h * 0.44 };
+  return { x: w * 0.08, y: h * 0.32, w: w * 0.84, h: h * 0.26 };
 }
 
 function drawGuide(ctx: CanvasRenderingContext2D, w: number, h: number) {
@@ -99,7 +110,7 @@ function drawReticle(
   at?: { x: number; y: number },
 ) {
   const cx = at?.x ?? w / 2;
-  const cy = at?.y ?? h * 0.42;
+  const cy = at?.y ?? h * 0.44;
   const r = Math.min(w, h) * 0.09;
   ctx.strokeStyle = locked ? "rgba(197, 212, 222, 0.9)" : "rgba(197, 212, 222, 0.45)";
   ctx.lineWidth = Math.max(1.5, h * 0.002);
@@ -278,7 +289,8 @@ export function useVeloxEngine(refs: EngineRefs) {
             raw: b,
           }));
           for (const m of mapped) boxes.push({ id: m.id, bbox: m.bbox });
-          const chosen = pickLock(
+          const aim = pendingAim && now - pendingAim.at < 3200 ? pendingAim : null;
+          let chosen = pickLock(
             found,
             ANALYSIS_W,
             ANALYSIS_H,
@@ -293,6 +305,22 @@ export function useVeloxEngine(refs: EngineRefs) {
               : null,
             null,
           );
+          if (aim) {
+            const ax = aim.nx * ANALYSIS_W;
+            const ay = aim.ny * ANALYSIS_H;
+            const hit = found.find(
+              (b) => ax >= b.x && ax <= b.x + b.w && ay >= b.y && ay <= b.y + b.h,
+            );
+            chosen =
+              hit ??
+              ({
+                x: Math.max(0, ax - ANALYSIS_W * 0.16),
+                y: Math.max(0, ay - ANALYSIS_H * 0.08),
+                w: ANALYSIS_W * 0.32,
+                h: ANALYSIS_H * 0.16,
+                score: 1e6,
+              } as typeof found[number]);
+          }
           const bbox = chosen
             ? {
                 x: chosen.x * sx,
@@ -306,9 +334,18 @@ export function useVeloxEngine(refs: EngineRefs) {
             ? (settings.assumedWidthM * f) / Math.max(8, bbox.w)
             : 0;
           const vehicle =
-            bbox && isVehicleLike(bbox, canvasW, canvasH, distGuess) ? bbox : null;
+            bbox && (aim || isVehicleLike(bbox, canvasW, canvasH, distGuess)) ? bbox : null;
 
           if (vehicle && chosen) {
+            if (lastBox) {
+              const x1 = Math.max(lastBox.x, vehicle.x);
+              const y1 = Math.max(lastBox.y, vehicle.y);
+              const x2 = Math.min(lastBox.x + lastBox.w, vehicle.x + vehicle.w);
+              const y2 = Math.min(lastBox.y + lastBox.h, vehicle.y + vehicle.h);
+              const inter = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+              const union = lastBox.w * lastBox.h + vehicle.w * vehicle.h - inter;
+              if (union > 0 && inter / union < 0.1) range.reset();
+            }
             kf.predict(dt);
             kf.update(vehicle, dt);
             const filtered = kf.box();
@@ -374,7 +411,7 @@ export function useVeloxEngine(refs: EngineRefs) {
       lastDist = lock?.distanceM ?? lastDist;
 
       const target = lock?.speedMps ?? 0;
-      displayMps = displayMps * 0.82 + target * 0.18;
+      displayMps = displayMps * 0.55 + target * 0.45;
       if (!lock) displayMps *= 0.9;
       if (displayMps < 0.2) displayMps = 0;
 

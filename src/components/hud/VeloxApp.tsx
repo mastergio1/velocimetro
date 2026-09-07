@@ -10,6 +10,7 @@ import {
   captureLockJpeg,
   disableCamera,
   enableCamera,
+  aimAt,
   useVeloxEngine,
 } from "@/lib/speed/engine";
 import { identifyVehicle } from "@/lib/speed/identify";
@@ -176,14 +177,20 @@ export function VeloxApp() {
       <canvas ref={simRef} className="pointer-events-none absolute inset-0 size-full opacity-0" />
       <canvas
         ref={overlayRef}
-        className="pointer-events-none absolute inset-0 size-full"
+        className="absolute inset-0 size-full"
+        onPointerDown={(e) => {
+          if (!cameraOn) return;
+          const r = e.currentTarget.getBoundingClientRect();
+          if (r.width < 1 || r.height < 1) return;
+          aimAt((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+        }}
       />
-      <canvas ref={analysisRef} className="hidden" width={240} height={135} />
+      <canvas ref={analysisRef} className="hidden" width={320} height={180} />
 
       <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-bg/35 via-transparent to-bg/25" />
 
-      <div className="hud-shell relative z-10 flex h-full flex-col">
-        <header className="flex items-center justify-between gap-2">
+      <div className="hud-shell pointer-events-none relative z-10 flex h-full flex-col">
+        <header className="pointer-events-auto flex items-center justify-between gap-2">
           <p className="font-condensed text-lg leading-none font-semibold tracking-[0.28em] text-fg">
             VELOX
           </p>
@@ -215,7 +222,9 @@ export function VeloxApp() {
         {cameraError ? (
           <p className="glass-dock mb-2 rounded-md px-3 py-2 text-xs text-danger">{cameraError}</p>
         ) : !lock ? (
-          <p className="mb-2 text-center text-xs text-muted">Apunta un auto. Quédate quieto.</p>
+          <p className="mb-2 text-center text-xs text-muted">
+            Apunta un auto y tócalo para fijar el lock.
+          </p>
         ) : null}
 
         <div className="mx-auto w-full max-w-lg text-center">
@@ -243,7 +252,7 @@ export function VeloxApp() {
           ) : null}
         </div>
 
-        <div className="mx-auto mt-2 flex w-full max-w-lg items-center gap-2">
+        <div className="pointer-events-auto mx-auto mt-2 flex w-full max-w-lg items-center gap-2">
           <MemoryDrawer />
           <Button
             variant={cameraOn ? "default" : "hud"}

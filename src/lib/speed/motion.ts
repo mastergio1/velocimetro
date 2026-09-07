@@ -17,7 +17,12 @@ export function insetBox(b: BBox, t = 0.1): BBox {
   return { x, y, w: Math.max(8, w), h: Math.max(8, h) };
 }
 
-/** Drop only obvious people-in-your-face. Cars must pass. */
+export function roadScore(b: BBox, frameH: number): number {
+  const cy = (b.y + b.h / 2) / frameH;
+  if (cy >= 0.32 && cy <= 0.56) return 1;
+  if (cy >= 0.26 && cy <= 0.64) return 0.4;
+  return 0.05;
+}
 export function isVehicleLike(b: BBox, frameW: number, frameH: number, distM?: number): boolean {
   const aspect = b.w / Math.max(1, b.h);
   if (aspect < 0.85 || aspect > 4.6) return false;
@@ -42,7 +47,7 @@ export function findMovingRegions(
 
   for (let y = 0; y < height; y++) {
     const gy = Math.min(gh - 1, Math.floor(y / cellH));
-    if (gy < gh * 0.12 || gy > gh * 0.92) continue;
+    if (gy < gh * 0.24 || gy > gh * 0.64) continue;
     const row = y * width;
     for (let x = 0; x < width; x++) {
       const d = Math.abs((next[row + x] ?? 0) - (prev[row + x] ?? 0));
@@ -110,7 +115,14 @@ export function findMovingRegions(
       if (area < frameA * 0.004 || area > frameA * 0.5) continue;
       if (raw.h > height * 0.58) continue;
       const tight = insetBox(raw, 0.08);
-      boxes.push({ ...tight, score: r.mass });
+      const aspectN =
+        tight.w / Math.max(1, tight.h) >= 1.15 && tight.w / Math.max(1, tight.h) <= 3.8
+          ? 1
+          : 0.35;
+      boxes.push({
+        ...tight,
+        score: r.mass * roadScore(tight, height) * aspectN,
+      });
     }
   }
 
@@ -129,7 +141,7 @@ export function pickLock(
   if (boxes.length === 0) return null;
   const pool = boxes;
   const cx = frameW / 2;
-  const cy = frameH * 0.45;
+  const cy = frameH * 0.44;
   if (prevBox && prevId) {
     let sticky: MotionBox | null = null;
     let stickyIou = 0;
@@ -140,17 +152,23 @@ export function pickLock(
         sticky = b;
       }
     }
-    if (sticky && stickyIou > 0.18) return sticky;
-    if (sticky && stickyIou > 0.08 && sticky.score >= (pool[0]?.score ?? 0) * 0.45) {
+    if (sticky && stickyIou > 0.18 && roadScore(sticky, frameH) >= 0.4) return sticky;
+    if (
+      sticky &&
+      stickyIou > 0.08 &&
+      roadScore(sticky, frameH) >= 0.4 &&
+      sticky.score >= (pool[0]?.score ?? 0) * 0.35
+    ) {
       return sticky;
     }
   }
   let best = pool[0]!;
-  let bestD = Infinity;
+  let bestS = -1;
   for (const b of pool) {
     const d = dist2(b, cx, cy);
-    if (d < bestD) {
-      bestD = d;
+    const s = (b.score * roadScore(b, frameH)) / (1 + d / (frameW * frameW * 0.2));
+    if (s > bestS) {
+      bestS = s;
       best = b;
     }
   }
