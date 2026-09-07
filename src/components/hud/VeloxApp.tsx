@@ -2,11 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Camera, LayoutGrid, ScanSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AnalogGauge } from "@/components/hud/AnalogGauge";
 import { CarCard } from "@/components/hud/CarCard";
 import { MemoryDrawer } from "@/components/hud/MemoryDrawer";
 import { SettingsDrawer } from "@/components/hud/SettingsDrawer";
-import { Sparkline } from "@/components/hud/Sparkline";
 import { fleetById } from "@/lib/speed/catalog";
 import {
   captureLockJpeg,
@@ -37,7 +35,6 @@ export function VeloxApp() {
   const speedMps = useVelox((s) => s.speedMps);
   const units = useVelox((s) => s.settings.units);
   const limitKmh = useVelox((s) => s.settings.speedLimitKmh);
-  const history = useVelox((s) => s.history);
   const cameraOn = useVelox((s) => s.cameraOn);
   const cameraReady = useVelox((s) => s.cameraReady);
   const cameraError = useVelox((s) => s.cameraError);
@@ -183,27 +180,19 @@ export function VeloxApp() {
       />
       <canvas ref={analysisRef} className="hidden" width={240} height={135} />
 
-      <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-bg/50 via-transparent to-bg/40" />
+      <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-bg/35 via-transparent to-bg/25" />
 
       <div className="hud-shell relative z-10 flex h-full flex-col">
-        <header className="glass-dock flex items-center justify-between gap-3 rounded-md px-3 py-2">
-          <div>
-            <p className="font-condensed text-xl leading-none font-semibold tracking-[0.28em] text-fg">
-              VELOX
-            </p>
-            <p className="hud-kicker mt-0.5 text-muted">Pistola</p>
-          </div>
+        <header className="flex items-center justify-between gap-2">
+          <p className="font-condensed text-lg leading-none font-semibold tracking-[0.28em] text-fg">
+            VELOX
+          </p>
           <div className="flex flex-wrap items-center justify-end gap-1.5">
             <span className="hud-chip tabular-nums text-hud">{clock}</span>
-            <span
-              className={cn(
-                "hud-chip",
-                lock ? "border-led text-led" : "text-muted",
-              )}
-            >
+            <span className={cn("hud-chip", lock ? "border-hud text-hud" : "text-muted")}>
               {lock ? "LOCK" : "SCAN"}
             </span>
-            {over ? <span className="hud-chip border-led text-led">FAST</span> : null}
+            {over ? <span className="hud-chip border-danger text-danger">FAST</span> : null}
             {incognito ? <span className="hud-chip border-warn text-warn">PRIV</span> : null}
             <Link
               to="/catalogo"
@@ -216,62 +205,59 @@ export function VeloxApp() {
           </div>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col justify-end">
-          {cameraError ? (
-            <p className="glass-dock mb-2 rounded-md px-3 py-2 text-xs text-danger">
-              {cameraError}
-            </p>
-          ) : !lock ? (
-            <p className="mb-2 text-center text-[11px] text-muted">
-              Apunta un auto y quédate quieto. Cualquier teléfono con cámara.
-            </p>
-          ) : null}
+        <div className="flex-1" />
 
-          <div className="glass-dock mx-auto w-full max-w-lg rounded-lg px-3 pt-2 pb-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="hud-chip text-muted">{unit}</span>
-              <span className="hud-chip tabular-nums text-led">
-                {dist ? `DIST ${dist.value}${dist.unit}` : "DIST —"}
-              </span>
-              <span className="hud-chip tabular-nums text-muted">
-                {lock ? `${Math.round(lock.confidence * 100)}%` : "0%"}
-              </span>
-            </div>
-            <p className="font-condensed led-speed mt-1 text-center text-speed leading-none font-bold text-led">
+        {cameraError ? (
+          <p className="glass-dock mb-2 rounded-md px-3 py-2 text-xs text-danger">{cameraError}</p>
+        ) : !lock ? (
+          <p className="mb-2 text-center text-xs text-muted">Apunta un auto. Quédate quieto.</p>
+        ) : null}
+
+        <div className="mx-auto w-full max-w-lg">
+          <div className="flex items-end justify-between gap-3">
+            <p
+              className={cn(
+                "font-condensed led-speed text-speed leading-none font-bold",
+                over ? "text-danger" : "text-hud",
+              )}
+            >
               {formatSpeed(speedMps, units)}
             </p>
-            {over ? (
-              <p className="hud-kicker mt-0.5 text-center text-danger">Exceso</p>
-            ) : null}
-            <div className="-mt-3 mx-auto w-full max-w-sm">
-              <AnalogGauge speedMps={speedMps} units={units} limitKmh={limitKmh} />
+            <div className="mb-1 flex flex-col items-end gap-1">
+              <span className="hud-chip text-hud">{unit}</span>
+              <span className="hud-chip tabular-nums text-hud">
+                {dist ? `DIST ${dist.value}${dist.unit}` : "DIST —"}
+              </span>
             </div>
-            {identification ? null : <Sparkline history={history} units={units} />}
-            <CarCard id={identification} lock={lock} />
           </div>
+          {identification || identifyStatus !== "idle" ? (
+            <div className="glass-dock mt-2 rounded-md px-3 py-2">
+              <CarCard id={identification} lock={lock} />
+            </div>
+          ) : null}
+        </div>
 
-          <div className="mx-auto mt-2 flex w-full max-w-lg items-center gap-2">
-            <MemoryDrawer />
-            <Button
-              variant={cameraOn ? "default" : "hud"}
-              className="min-h-12 flex-1"
-              onClick={() => (cameraOn ? disableCamera() : void enableCamera())}
-            >
-              <Camera />
-              {cameraOn ? "Cámara activa" : "Activar cámara"}
-            </Button>
-            <Button
-              variant={needsAi ? "default" : "hud"}
-              className="min-h-12"
-              disabled={!lock || identifyStatus === "loading"}
-              data-testid="identify"
-              onClick={() => void onIdentify()}
-            >
-              <ScanSearch />
-              {identifyStatus === "loading" ? "Leyendo…" : "Identificar"}
-            </Button>
-            <SettingsDrawer />
-          </div>
+        <div className="mx-auto mt-2 flex w-full max-w-lg items-center gap-2">
+          <MemoryDrawer />
+          <Button
+            variant={cameraOn ? "default" : "hud"}
+            className="min-h-12 flex-1"
+            onClick={() => (cameraOn ? disableCamera() : void enableCamera())}
+          >
+            <Camera />
+            {cameraOn ? "Cámara activa" : "Activar cámara"}
+          </Button>
+          <Button
+            variant={needsAi ? "default" : "hud"}
+            className="min-h-12"
+            disabled={!lock || identifyStatus === "loading"}
+            data-testid="identify"
+            onClick={() => void onIdentify()}
+          >
+            <ScanSearch />
+            {identifyStatus === "loading" ? "Leyendo…" : "Identificar"}
+          </Button>
+          <SettingsDrawer />
         </div>
       </div>
     </main>
