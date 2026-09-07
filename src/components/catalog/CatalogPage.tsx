@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Crosshair, RotateCcw } from "lucide-react";
+import { Crosshair, Download, RotateCcw, Share2 } from "lucide-react";
 import { Drawer } from "vaul";
 import { Button } from "@/components/ui/button";
 import { CarSilhouette } from "@/components/catalog/CarSilhouette";
@@ -11,6 +11,7 @@ import {
   type GammaId,
 } from "@/lib/speed/catalog";
 import { useVelox } from "@/lib/speed/store";
+import { downloadCatalog, shareFicha } from "@/lib/speed/share";
 import { cn } from "@/lib/utils";
 
 type Filter = "all" | GammaId;
@@ -43,6 +44,7 @@ export function CatalogPage() {
   const resetCatalog = useVelox((s) => s.resetCatalog);
   const [filter, setFilter] = useState<Filter>("all");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   useEffect(() => {
     hydrate();
@@ -167,11 +169,36 @@ export function CatalogPage() {
       )}
 
       {total > 0 ? (
-        <div className="pb-6">
-          <Button variant="ghost" className="w-full" onClick={() => resetCatalog()}>
-            <RotateCcw />
-            Reiniciar catálogo
+        <div className="pb-6 space-y-2">
+          <Button variant="ghost" className="w-full" onClick={() => downloadCatalog(collection)}>
+            <Download />
+            Exportar catálogo (JSON)
           </Button>
+          {confirmReset ? (
+            <div className="space-y-2">
+              <p className="text-center text-sm text-muted">
+                Esto borra todas las fichas de este teléfono. No se puede deshacer.
+              </p>
+              <Button
+                variant="danger"
+                className="w-full"
+                onClick={() => {
+                  resetCatalog();
+                  setConfirmReset(false);
+                }}
+              >
+                Sí, borrar catálogo
+              </Button>
+              <Button variant="ghost" className="w-full" onClick={() => setConfirmReset(false)}>
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <Button variant="ghost" className="w-full" onClick={() => setConfirmReset(true)}>
+              <RotateCcw />
+              Reiniciar catálogo
+            </Button>
+          )}
         </div>
       ) : null}
 
@@ -200,7 +227,15 @@ export function CatalogPage() {
                   <span className="text-hud">Dato · </span>
                   {openTile.funFact}
                 </p>
-                <Button className="mt-6 w-full" onClick={() => setOpenId(null)}>
+                <Button
+                  variant="ghost"
+                  className="mt-4 w-full"
+                  onClick={() => void shareFicha(openTile)}
+                >
+                  <Share2 />
+                  Compartir ficha
+                </Button>
+                <Button className="mt-2 w-full" onClick={() => setOpenId(null)}>
                   Listo
                 </Button>
               </div>

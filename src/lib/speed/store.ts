@@ -26,9 +26,25 @@ function loadSettings(): Settings {
   if (typeof window === "undefined") return { ...DEFAULT_SETTINGS };
   try {
     const raw = window.localStorage.getItem("velox-settings");
-    if (!raw) return { ...DEFAULT_SETTINGS };
-    const parsed = JSON.parse(raw) as Partial<Settings>;
-    return { ...DEFAULT_SETTINGS, ...parsed };
+    if (!raw || raw.length > 4_000) return { ...DEFAULT_SETTINGS };
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { ...DEFAULT_SETTINGS };
+    }
+    const num = (v: unknown, min: number, max: number, fallback: number) => {
+      const n = typeof v === "number" ? v : Number(v);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.min(max, Math.max(min, n));
+    };
+    return {
+      units: parsed.units === "mph" ? "mph" : "kmh",
+      cameraFacing: parsed.cameraFacing === "user" ? "user" : "environment",
+      assumedWidthM: num(parsed.assumedWidthM, 1.4, 2.2, DEFAULT_SETTINGS.assumedWidthM),
+      sensitivity: num(parsed.sensitivity, 0.4, 2.4, DEFAULT_SETTINGS.sensitivity),
+      speedLimitKmh: num(parsed.speedLimitKmh, 20, 400, DEFAULT_SETTINGS.speedLimitKmh),
+      showBoxes: parsed.showBoxes === false ? false : true,
+      incognito: parsed.incognito === true,
+    };
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
@@ -39,6 +55,7 @@ function loadMemory(): MemoryEntry[] {
   try {
     const raw = window.localStorage.getItem(MEMORY_KEY);
     if (!raw) return [];
+    if (raw.length > 750_000) return [];
     const parsed = JSON.parse(raw) as MemoryEntry[];
     return Array.isArray(parsed) ? parsed.slice(0, MEMORY_MAX) : [];
   } catch {
@@ -51,6 +68,7 @@ function loadCollection(): CollectionEntry[] {
   try {
     const raw = window.localStorage.getItem(COLLECTION_KEY);
     if (!raw) return [];
+    if (raw.length > 750_000) return [];
     const parsed = JSON.parse(raw) as CollectionEntry[];
     return Array.isArray(parsed) ? parsed.slice(0, COLLECTION_MAX) : [];
   } catch {
@@ -210,10 +228,13 @@ export const useVelox = create<VeloxStore>((set, get) => ({
       (m) => `${m.make}|${m.model}`.toLowerCase() !== key,
     );
     const memory = [entry, ...rest].slice(0, MEMORY_MAX);
-    const dex = upsertCollection(get().collection, vehicle, entry.speedKmh);
-    persistCollection(dex.collection);
+    const incognito = get().settings.incognito;
+    const dex = incognito
+      ? { collection: get().collection, lastUnlockId: get().lastUnlockId }
+      : upsertCollection(get().collection, vehicle, entry.speedKmh);
+    if (!incognito) persistCollection(dex.collection);
     set({
-      memory,
+      memory: incognito ? get().memory : memory,
       identification: vehicle,
       identifiedLockId: lockId ?? get().lock?.id ?? null,
       identifyStatus: "idle",
@@ -221,7 +242,7 @@ export const useVelox = create<VeloxStore>((set, get) => ({
       collection: dex.collection,
       lastUnlockId: dex.lastUnlockId,
     });
-    if (typeof window !== "undefined") {
+    if (!incognito && typeof window !== "undefined") {
       window.localStorage.setItem(MEMORY_KEY, JSON.stringify(memory));
     }
   },

@@ -8,6 +8,7 @@ export type Settings = {
   sensitivity: number;
   speedLimitKmh: number;
   showBoxes: boolean;
+  incognito: boolean;
 };
 
 export type BBox = { x: number; y: number; w: number; h: number };
@@ -62,6 +63,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sensitivity: 1,
   speedLimitKmh: 120,
   showBoxes: true,
+  incognito: false,
 };
 
 export const HISTORY_LEN = 96;

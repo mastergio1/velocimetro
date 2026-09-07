@@ -1,0 +1,25 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { RangeTracker } from "./tracker.ts";
+
+describe("RangeTracker", () => {
+  it("estimates speed from closing range", () => {
+    const t = new RangeTracker();
+    const frameW = 400;
+    for (let i = 0; i < 8; i++) {
+      const w = 40 + i * 6;
+      t.push({ x: 180, y: 100, w, h: 28 }, frameW, 1.8, 1, i * 80);
+    }
+    assert.ok(t.speedMps > 1, `expected motion, got ${t.speedMps}`);
+    assert.ok(t.distanceM > 0);
+  });
+
+  it("fuses optical-flow speed when confident", () => {
+    const t = new RangeTracker();
+    t.push({ x: 160, y: 90, w: 80, h: 36 }, 400, 1.8, 1, 0, 0, 0);
+    t.push({ x: 160, y: 90, w: 82, h: 36 }, 400, 1.8, 1, 80, 0, 0);
+    t.push({ x: 160, y: 90, w: 84, h: 36 }, 400, 1.8, 1, 160, 0, 0);
+    t.push({ x: 160, y: 90, w: 86, h: 36 }, 400, 1.8, 1, 240, 28, 0.8);
+    assert.ok(t.speedMps > 5, `flow should lift speed, got ${t.speedMps}`);
+  });
+});

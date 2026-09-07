@@ -150,11 +150,25 @@ export function SettingsDrawer() {
               </Row>
 
               <div className="flex h-12 items-center justify-between gap-3 rounded-md border border-line bg-raised/70 px-3">
-                <p className="text-sm font-medium text-fg">Cajas de detección</p>
+                <div>
+                  <p className="text-sm font-medium text-fg">Cajas de detección</p>
+                </div>
                 <Switch
                   checked={settings.showBoxes}
                   onCheckedChange={(showBoxes) => setSettings({ showBoxes })}
                   aria-label="Mostrar cajas de detección"
+                />
+              </div>
+
+              <div className="flex min-h-12 items-center justify-between gap-3 rounded-md border border-line bg-raised/70 px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium text-fg">Modo incógnito</p>
+                  <p className="text-xs text-muted">Mide e identifica, no guarda fichas.</p>
+                </div>
+                <Switch
+                  checked={settings.incognito}
+                  onCheckedChange={(incognito) => setSettings({ incognito })}
+                  aria-label="Modo incógnito"
                 />
               </div>
 

@@ -48,6 +48,7 @@ export function VeloxApp() {
   const identifyStatus = useVelox((s) => s.identifyStatus);
   const remember = useVelox((s) => s.remember);
   const collection = useVelox((s) => s.collection);
+  const incognito = useVelox((s) => s.settings.incognito);
 
   const [clock, setClock] = useState("--:--");
   useEffect(() => {
@@ -201,6 +202,11 @@ export function VeloxApp() {
             <span className="hud-kicker rounded-sm border border-line bg-surface/70 px-2 py-0.5 text-hud">
               {lock ? "BLOQUEADO" : "BUSCANDO"}
             </span>
+            {incognito ? (
+              <span className="hud-kicker rounded-sm border border-warn/50 bg-surface/70 px-2 py-0.5 text-warn">
+                INCÓGNITO
+              </span>
+            ) : null}
             <Link
               to="/catalogo"
               data-testid="catalog-link"
@@ -214,10 +220,10 @@ export function VeloxApp() {
 
         <p className="mt-2 text-center text-[11px] leading-snug text-muted sm:text-xs">
           {channel === "demo"
-            ? "Demo de calle: el retículo bloquea un auto, lee su velocidad y arma la ficha. Activa la cámara para medir de verdad."
+            ? "Cualquier iPhone, Android o tablet. Demo de calle: el retículo bloquea un auto y arma la ficha. Activa la cámara para medir de verdad."
             : lock
-              ? "Quédate quieto y mantén el auto en el centro: así se lee SU velocidad (no la tuya) y se arma la ficha."
-              : "Apunta a cualquier auto. El teléfono quieto da la mejor medición."}
+              ? "Quédate quieto y mantén el auto en el centro: se lee SU velocidad (no la tuya) y se arma la ficha."
+              : "Apunta a cualquier auto. Sirve en iPhone, Android y tablet — el teléfono quieto da la mejor medición."}
         </p>
 
         {cameraError ? (
@@ -237,6 +243,9 @@ export function VeloxApp() {
               {formatSpeed(speedMps, units)}
             </p>
             <p className="mt-0.5 text-sm tracking-[0.28em] text-muted uppercase">{unit}</p>
+            {over ? (
+              <p className="hud-kicker mt-0.5 text-danger">Exceso de límite</p>
+            ) : null}
             <p className="mt-0.5 text-xs tabular-nums text-muted">
               {dist ? `Dist ${dist.value} ${dist.unit}` : "Sin blanco"}
               {lock ? ` · lock ${Math.round(lock.confidence * 100)}%` : ""}

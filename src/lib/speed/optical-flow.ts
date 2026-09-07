@@ -192,3 +192,27 @@ export class FlowTracker {
     };
   }
 }
+
+export function flowSpeedMps(
+  vectors: FlowVector[],
+  bbox: { x: number; y: number; w: number; h: number },
+  frameW: number,
+  distanceM: number,
+  dt: number,
+  hfovRad: number,
+): { speedMps: number; confidence: number } {
+  if (dt <= 0 || distanceM <= 0 || frameW <= 0) return { speedMps: 0, confidence: 0 };
+  const x1 = bbox.x;
+  const y1 = bbox.y;
+  const x2 = bbox.x + bbox.w;
+  const y2 = bbox.y + bbox.h;
+  const inside = vectors.filter((v) => v.x >= x1 && v.x <= x2 && v.y >= y1 && v.y <= y2);
+  if (inside.length < 2) return { speedMps: 0, confidence: 0 };
+  const pxps = median(inside.map((v) => Math.hypot(v.dx, v.dy) / dt));
+  const f = frameW / 2 / Math.tan(hfovRad / 2);
+  const mps = (pxps * distanceM) / Math.max(8, f);
+  return {
+    speedMps: Math.min(155, mps),
+    confidence: Math.min(1, inside.length / 8),
+  };
+}

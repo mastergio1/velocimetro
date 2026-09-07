@@ -1,9 +1,11 @@
 import type { RefObject } from "react";
 import { useEffect, useRef } from "react";
+import { cameraErrorMessage, openCamera } from "./camera";
 import { fleetById } from "./catalog";
 import { formatSpeed, speedUnit } from "./format";
 import { requestMotionPermission } from "./gps";
 import { findMovingRegions, pickLock, rgbaToGray } from "./motion";
+import { FlowTracker, flowSpeedMps } from "./optical-flow";
 import {
   drawRoad,
   seedCars,
@@ -13,7 +15,7 @@ import {
   type SimCar,
 } from "./road-sim";
 import { useVelox } from "./store";
-import { RangeTracker } from "./tracker";
+import { HFOV, RangeTracker } from "./tracker";
 import { HISTORY_LEN, type BBox, type LockedTarget } from "./types";
 
 const ANALYSIS_W = 240;
@@ -150,15 +152,7 @@ export function useVeloxEngine(refs: EngineRefs) {
       useVelox.setState({ cameraError: null });
       try {
         await requestMotionPermission();
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            facingMode: { ideal: facing },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            frameRate: { ideal: 30 },
-          },
-        });
+        const stream = await openCamera(facing);
         if (cancelled) {
           for (const t of stream.getTracks()) t.stop();
           return;
@@ -167,19 +161,15 @@ export function useVeloxEngine(refs: EngineRefs) {
         video.playsInline = true;
         video.muted = true;
         video.setAttribute("playsinline", "true");
+        video.setAttribute("webkit-playsinline", "true");
         await video.play();
         useVelox.setState({ cameraReady: true, cameraError: null });
       } catch (err) {
-        const name = err instanceof Error ? err.name : "";
-        let msg = "No se pudo abrir la cámara.";
-        if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-          msg = "Permiso de cámara denegado. Actívalo en Ajustes del sistema.";
-        } else if (name === "NotFoundError") {
-          msg = "No hay cámara disponible.";
-        } else if (name === "NotReadableError") {
-          msg = "La cámara está ocupada por otra app.";
-        }
-        useVelox.setState({ cameraReady: false, cameraError: msg, cameraOn: false });
+        useVelox.setState({
+          cameraReady: false,
+          cameraError: cameraErrorMessage(err),
+          cameraOn: false,
+        });
       }
     })();
 
@@ -195,6 +185,7 @@ export function useVeloxEngine(refs: EngineRefs) {
 
   useEffect(() => {
     const range = new RangeTracker();
+    const flow = new FlowTracker(ANALYSIS_W, ANALYSIS_H);
     let road: RoadState = { t: 0, distance: 0, speedMps: 0, heading: 18 };
     let cars: SimCar[] = seedCars();
     let prevGray: Uint8Array | null = null;
@@ -288,6 +279,7 @@ export function useVeloxEngine(refs: EngineRefs) {
         rgbaToGray(img.data, gray);
         if (prevGray) {
           const found = findMovingRegions(prevGray, gray, ANALYSIS_W, ANALYSIS_H);
+          const fr = flow.push(img, dt);
           const sx = canvasW / ANALYSIS_W;
           const sy = canvasH / ANALYSIS_H;
           const mapped = found.map((b, i) => ({
@@ -318,7 +310,26 @@ export function useVeloxEngine(refs: EngineRefs) {
               w: chosen.w * sx,
               h: chosen.h * sy,
             };
-            range.push(bbox, canvasW, settings.assumedWidthM, settings.sensitivity, now);
+            const distGuess =
+              (settings.assumedWidthM * (canvasW / 2 / Math.tan(HFOV / 2))) /
+              Math.max(8, bbox.w);
+            const flowV = flowSpeedMps(
+              fr.vectors,
+              chosen,
+              ANALYSIS_W,
+              distGuess,
+              dt,
+              HFOV,
+            );
+            range.push(
+              bbox,
+              canvasW,
+              settings.assumedWidthM,
+              settings.sensitivity,
+              now,
+              flowV.speedMps,
+              flowV.confidence,
+            );
             lock = {
               id: "live",
               bbox,
@@ -340,6 +351,7 @@ export function useVeloxEngine(refs: EngineRefs) {
       } else {
         prevGray = null;
         held = null;
+        flow.reset();
       }
 
       lastLockId = lock?.id ?? null;
