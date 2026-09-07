@@ -60,6 +60,17 @@
     cursor: pointer;
   }
 
+  video.velox-demo::-webkit-media-controls,
+  video.velox-demo::-webkit-media-controls-start-playback-button,
+  video.velox-demo::-webkit-media-controls-overlay-play-button {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    -webkit-appearance: none;
+  }
+
   h1,
   h2,
   h3 {
