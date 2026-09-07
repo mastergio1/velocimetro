@@ -43,6 +43,7 @@ export function VeloxApp() {
   const identification = useVelox((s) => s.identification);
   const identifiedLockId = useVelox((s) => s.identifiedLockId);
   const identifyStatus = useVelox((s) => s.identifyStatus);
+  const identifyError = useVelox((s) => s.identifyError);
   const remember = useVelox((s) => s.remember);
   const collection = useVelox((s) => s.collection);
   const incognito = useVelox((s) => s.settings.incognito);
@@ -227,10 +228,14 @@ export function VeloxApp() {
             {dist ? ` · DIST ${dist.value}${dist.unit}` : ""}
             {over ? " · FAST" : ""}
           </p>
-          {identification || identifyStatus !== "idle" ? (
+          {identification ? (
             <div className="glass-dock mt-3 rounded-md px-3 py-2 text-left">
               <CarCard id={identification} lock={lock} />
             </div>
+          ) : identifyStatus === "loading" ? (
+            <p className="hud-kicker mt-2 text-muted">Identificando…</p>
+          ) : identifyStatus === "error" && identifyError ? (
+            <p className="mt-2 text-xs text-danger">{identifyError}</p>
           ) : null}
         </div>
 

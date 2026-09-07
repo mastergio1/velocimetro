@@ -2,7 +2,6 @@ import type { RefObject } from "react";
 import { useEffect, useRef } from "react";
 import { cameraErrorMessage, openCamera } from "./camera";
 import { fleetById } from "./catalog";
-import { formatSpeed, speedUnit } from "./format";
 import { requestMotionPermission } from "./gps";
 import { findMovingRegions, pickLock, rgbaToGray } from "./motion";
 import { FlowTracker, flowSpeedMps } from "./optical-flow";
@@ -64,9 +63,15 @@ function resizeCanvas(canvas: HTMLCanvasElement, cssW: number, cssH: number, dpr
   return { w, h };
 }
 
-function drawReticle(ctx: CanvasRenderingContext2D, w: number, h: number, locked: boolean) {
-  const cx = w / 2;
-  const cy = h * 0.6;
+function drawReticle(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  locked: boolean,
+  at?: { x: number; y: number },
+) {
+  const cx = at?.x ?? w / 2;
+  const cy = at?.y ?? h * 0.6;
   const r = Math.min(w, h) * 0.09;
   ctx.strokeStyle = locked ? "rgba(197, 212, 222, 0.9)" : "rgba(197, 212, 222, 0.45)";
   ctx.lineWidth = Math.max(1.5, h * 0.002);
@@ -386,14 +391,14 @@ export function useVeloxEngine(refs: EngineRefs) {
             drawBracket(oCtx, lock.bbox, "rgba(197, 212, 222, 0.95)");
             const ident = store.identification;
             const spec = lock.fleetId ? fleetById(lock.fleetId) : undefined;
-            if (!ident) {
-              const title = spec
-                ? `${spec.make} ${spec.model}`
-                : `${formatSpeed(lock.speedMps, settings.units)} ${speedUnit(settings.units)}`;
-              drawLockCaption(oCtx, lock.bbox, title, overlay.height);
+            if (!ident && spec) {
+              drawLockCaption(oCtx, lock.bbox, `${spec.make} ${spec.model}`, overlay.height);
             }
           }
-          drawReticle(oCtx, overlay.width, overlay.height, !!lock);
+          const aim = lock
+            ? { x: lock.bbox.x + lock.bbox.w / 2, y: lock.bbox.y + lock.bbox.h / 2 }
+            : undefined;
+          drawReticle(oCtx, overlay.width, overlay.height, !!lock, aim);
         }
       }
 
