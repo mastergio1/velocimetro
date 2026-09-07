@@ -14,6 +14,7 @@ import {
   type RoadState,
   type SimCar,
 } from "./road-sim";
+import { redactPlatesFromImageData } from "./plates";
 import { useVelox } from "./store";
 import { HFOV, RangeTracker } from "./tracker";
 import { HISTORY_LEN, type BBox, type LockedTarget } from "./types";
@@ -458,5 +459,7 @@ export function captureLockJpeg(
   const ctx = out.getContext("2d");
   if (!ctx) return null;
   ctx.drawImage(source, sx, sy, sw, sh, 0, 0, out.width, out.height);
+  const img = ctx.getImageData(0, 0, out.width, out.height);
+  redactPlatesFromImageData(img, ctx);
   return out.toDataURL("image/jpeg", 0.72);
 }

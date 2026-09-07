@@ -13,6 +13,7 @@
   --color-line: #2a2e36;
   --color-accent: #b8c4ce;
   --color-hud: #c5d4de;
+  --color-led: #ff3b2f;
   --color-danger: #c47a72;
   --color-ok: #7a9e8a;
   --color-warn: #c4a574;
@@ -27,7 +28,7 @@
   --text-cluster: clamp(0.7rem, 2.4vw, 0.85rem);
 
   --shadow-hud: 0 0 24px color-mix(in oklab, var(--color-bg) 70%, transparent);
-  --shadow-led: 0 0 18px color-mix(in oklab, var(--color-hud) 55%, transparent);
+  --shadow-led: 0 0 18px color-mix(in oklab, var(--color-led) 55%, transparent);
   --shadow-glass: 0 0 0 1px color-mix(in oklab, var(--color-fg) 10%, transparent);
 }
 

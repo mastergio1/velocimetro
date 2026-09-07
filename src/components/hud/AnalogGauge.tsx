@@ -127,7 +127,7 @@ export function AnalogGauge({ speedMps, units, limitKmh }: Props) {
       />
       <path
         d={arcPath(CX, CY, R, START, angle)}
-        className={over ? "stroke-danger" : "stroke-hud"}
+        className="stroke-led"
         fill="none"
         strokeWidth="10"
         strokeLinecap="butt"
@@ -146,11 +146,11 @@ export function AnalogGauge({ speedMps, units, limitKmh }: Props) {
         y1={hub.y}
         x2={needle.x}
         y2={needle.y}
-        className={over ? "stroke-danger" : "stroke-fg"}
+        className="stroke-led"
         strokeWidth="2.4"
         strokeLinecap="round"
       />
-      <circle cx={CX} cy={CY} r="7" className="fill-fg" />
+      <circle cx={CX} cy={CY} r="7" className="fill-led" />
       <circle cx={CX} cy={CY} r="3.2" className="fill-bg" />
       <text
         x={CX}

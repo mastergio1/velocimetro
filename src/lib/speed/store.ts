@@ -106,13 +106,19 @@ function persistCollection(collection: CollectionEntry[]) {
 }
 
 function asVehicle(id: VehicleId): VehicleId {
+  const scrub = (s: string) =>
+    s
+      .replace(/\b[A-Z]{4}\s?-?\s?\d{2}\b/gi, "")
+      .replace(/\b[A-Z]{2}\s?-?\s?\d{4}\b/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
   return {
     make: id.make,
     model: id.model,
     year: id.year,
     color: id.color,
-    description: id.description,
-    funFact: id.funFact,
+    description: scrub(id.description),
+    funFact: scrub(id.funFact),
     klass: id.klass,
   };
 }

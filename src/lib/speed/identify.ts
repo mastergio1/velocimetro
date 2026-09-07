@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { VehicleId } from "./types";
 
 const PROMPT = `Identifica CUALQUIER vehículo de la foto: auto, SUV, pickup, van, bus o coupé. Marcas de cualquier país (Europa, Japón, Corea, China, América, etc.). No te limites a marcas famosas. Si ves emblema o silueta, da la marca y el modelo más específico posible (ej. "BYD Song Plus", "Suzuki Swift", "Peugeot 208", "Chery Tiggo 2").
+PRIVACIDAD: ignora patentes, PPU, matrículas y cualquier texto de placa. Nunca las transcribas ni las cites en description o funFact. Si hay una barra negra sobre la placa, es intencional.
 Responde SOLO JSON válido, sin markdown:
 {"make":"marca o unknown","model":"modelo","year":"año o generación","color":"color","klass":"sedan|hatch|suv|pickup|van|sport|super|hyper|classic","description":"una frase breve en español, máximo 140 caracteres","funFact":"un dato curioso verdadero en español, máximo 180 caracteres"}
 Si no hay un vehículo claro, usa make "unknown".`;

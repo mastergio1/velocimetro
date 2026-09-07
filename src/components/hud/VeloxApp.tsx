@@ -198,12 +198,12 @@ export function VeloxApp() {
             <span
               className={cn(
                 "hud-chip",
-                lock ? "border-hud text-hud" : "text-muted",
+                lock ? "border-led text-led" : "text-muted",
               )}
             >
               {lock ? "LOCK" : "SCAN"}
             </span>
-            {over ? <span className="hud-chip border-danger text-danger">FAST</span> : null}
+            {over ? <span className="hud-chip border-led text-led">FAST</span> : null}
             {incognito ? <span className="hud-chip border-warn text-warn">PRIV</span> : null}
             <Link
               to="/catalogo"
@@ -230,19 +230,14 @@ export function VeloxApp() {
           <div className="glass-dock mx-auto w-full max-w-lg rounded-lg px-3 pt-2 pb-2">
             <div className="flex items-center justify-between gap-2">
               <span className="hud-chip text-muted">{unit}</span>
-              <span className="hud-chip tabular-nums text-hud">
+              <span className="hud-chip tabular-nums text-led">
                 {dist ? `DIST ${dist.value}${dist.unit}` : "DIST —"}
               </span>
               <span className="hud-chip tabular-nums text-muted">
                 {lock ? `${Math.round(lock.confidence * 100)}%` : "0%"}
               </span>
             </div>
-            <p
-              className={cn(
-                "font-condensed led-speed mt-1 text-center text-speed leading-none font-bold",
-                over ? "text-danger" : "text-hud",
-              )}
-            >
+            <p className="font-condensed led-speed mt-1 text-center text-speed leading-none font-bold text-led">
               {formatSpeed(speedMps, units)}
             </p>
             {over ? (
