@@ -7,7 +7,7 @@ import {
   wildId,
   type CollectionEntry,
   type WildEntry,
-} from "./catalog";
+} from "./catalog.ts";
 import {
   COLLECTION_KEY,
   COLLECTION_MAX,
@@ -20,7 +20,7 @@ import {
   type MemoryEntry,
   type Settings,
   type VehicleId,
-} from "./types";
+} from "./types.ts";
 
 function loadSettings(): Settings {
   if (typeof window === "undefined") return { ...DEFAULT_SETTINGS };

@@ -4,8 +4,8 @@ import {
   matchCatalog,
   type CollectionEntry,
   type GammaId,
-} from "./catalog";
-import type { VehicleId } from "./types";
+} from "./catalog.ts";
+import type { VehicleId } from "./types.ts";
 
 export function fichaText(v: VehicleId, extra?: string): string {
   const lines = [

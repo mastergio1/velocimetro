@@ -19,13 +19,13 @@ function rateOk(): boolean {
   return true;
 }
 
-function clip(value: unknown, max: number): string {
+export function clip(value: unknown, max: number): string {
   return String(value ?? "")
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
     .slice(0, max);
 }
 
-function normalizeImage(image: string): string | null {
+export function normalizeImage(image: string): string | null {
   const s = image.trim();
   if (s.length < 32 || s.length > 900_000) return null;
   if (/^(https?|file|javascript|blob):/i.test(s)) return null;
@@ -39,7 +39,7 @@ function normalizeImage(image: string): string | null {
   return `data:image/jpeg;base64,${s.replace(/\s/g, "")}`;
 }
 
-function extractJson(text: string): VehicleId | null {
+export function extractJson(text: string): VehicleId | null {
   const trimmed = text.trim().replace(/^```json\s*|\s*```$/g, "");
   const start = trimmed.indexOf("{");
   const end = trimmed.lastIndexOf("}");
