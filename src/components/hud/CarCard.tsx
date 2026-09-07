@@ -3,7 +3,7 @@ import { ChevronDown, Share2 } from "lucide-react";
 import type { LockedTarget, VehicleId } from "@/lib/speed/types";
 import { formatSpeed, speedUnit } from "@/lib/speed/format";
 import { gammaById, inferGamma, matchCatalog } from "@/lib/speed/catalog";
-import { shareFicha } from "@/lib/speed/share";
+import { FichaPreview } from "@/components/hud/FichaPreview";
 import { useVelox } from "@/lib/speed/store";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -19,11 +19,12 @@ export function CarCard({
   const status = useVelox((s) => s.identifyStatus);
   const err = useVelox((s) => s.identifyError);
   const [open, setOpen] = useState(false);
-  const [shareNote, setShareNote] = useState<string | null>(null);
+  const [preview, setPreview] = useState(false);
   const hit = id ? matchCatalog(id.make, id.model) : undefined;
   const gamma = id
     ? gammaById(hit?.gamma ?? inferGamma(id.make, id.model, id.klass))
     : null;
+  const extra = lock ? `${formatSpeed(lock.speedMps, units)} ${speedUnit(units)}` : undefined;
 
   if (!id && status !== "loading" && !err) return null;
 
@@ -56,7 +57,7 @@ export function CarCard({
             {id.year}
             {id.color ? ` · ${id.color}` : ""}
             {gamma ? ` · ${gamma.rarity}` : ""}
-            {lock ? ` · ${formatSpeed(lock.speedMps, units)} ${speedUnit(units)}` : ""}
+            {extra ? ` · ${extra}` : ""}
           </p>
           <p className="text-sm leading-snug text-pretty text-fg">{id.description}</p>
           <p className="text-sm leading-snug text-muted">
@@ -66,18 +67,22 @@ export function CarCard({
           <Button
             variant="hud"
             size="sm"
-            onClick={() => {
-              void shareFicha(
-                id,
-                lock ? `${formatSpeed(lock.speedMps, units)} ${speedUnit(units)}` : undefined,
-              ).then((r) => setShareNote(r === "copied" ? "Copiado" : r === "shared" ? "Enviado" : null));
+            onClick={(e) => {
+              e.stopPropagation();
+              setPreview(true);
             }}
           >
             <Share2 />
-            {shareNote ?? "Compartir"}
+            Ver tarjeta
           </Button>
         </div>
       ) : null}
+      <FichaPreview
+        open={preview}
+        onOpenChange={setPreview}
+        vehicle={id}
+        extra={extra}
+      />
     </div>
   );
 }

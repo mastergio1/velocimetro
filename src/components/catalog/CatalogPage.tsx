@@ -11,7 +11,8 @@ import {
   type GammaId,
 } from "@/lib/speed/catalog";
 import { useVelox } from "@/lib/speed/store";
-import { downloadCatalog, shareFicha } from "@/lib/speed/share";
+import { downloadCatalog } from "@/lib/speed/share";
+import { FichaPreview } from "@/components/hud/FichaPreview";
 import { cn } from "@/lib/utils";
 
 type Filter = "all" | GammaId;
@@ -45,6 +46,7 @@ export function CatalogPage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [openId, setOpenId] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     hydrate();
@@ -230,10 +232,10 @@ export function CatalogPage() {
                 <Button
                   variant="ghost"
                   className="mt-4 w-full"
-                  onClick={() => void shareFicha(openTile)}
+                  onClick={() => setShareOpen(true)}
                 >
                   <Share2 />
-                  Compartir ficha
+                  Ver tarjeta
                 </Button>
                 <Button className="mt-2 w-full" onClick={() => setOpenId(null)}>
                   Listo
@@ -243,6 +245,11 @@ export function CatalogPage() {
           </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>
+      <FichaPreview
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        vehicle={openTile ?? null}
+      />
     </main>
   );
 }
