@@ -28,6 +28,17 @@ describe("extractJson", () => {
     assert.equal(extractJson("no json here"), null);
   });
 
+  it("keeps a sane wheelbase and drops junk", () => {
+    const id = extractJson(
+      '{"make":"Mazda","model":"CX-5","year":"2021","color":"blanco","klass":"suv","wheelbaseM":2.7,"description":"SUV.","funFact":"Dato."}',
+    );
+    assert.equal(id?.wheelbaseM, 2.7);
+    const bad = extractJson(
+      '{"make":"Mazda","model":"CX-5","year":"2021","color":"blanco","klass":"suv","wheelbaseM":99,"description":"SUV.","funFact":"Dato."}',
+    );
+    assert.equal(bad?.wheelbaseM, undefined);
+  });
+
   it("clips XSS and does not keep extra keys", () => {
     const id = extractJson(
       JSON.stringify({

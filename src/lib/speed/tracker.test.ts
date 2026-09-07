@@ -1,6 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { RangeTracker } from "./tracker.ts";
+import { median, RangeTracker } from "./tracker.ts";
+
+describe("median", () => {
+  it("drops outliers", () => {
+    assert.equal(median([31, 11, 30, 16, 14, 200, 17]), 17);
+  });
+});
 
 describe("RangeTracker", () => {
   it("estimates speed from closing range", () => {

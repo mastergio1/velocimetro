@@ -8,6 +8,8 @@ export type Settings = {
   sensitivity: number;
   speedLimitKmh: number;
   showBoxes: boolean;
+  showGuide: boolean;
+  highFps: boolean;
   incognito: boolean;
 };
 
@@ -21,6 +23,7 @@ export type VehicleId = {
   description: string;
   funFact: string;
   klass?: string;
+  wheelbaseM?: number;
 };
 
 export type MemoryEntry = VehicleId & {
@@ -63,6 +66,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sensitivity: 1,
   speedLimitKmh: 120,
   showBoxes: false,
+  showGuide: true,
+  highFps: true,
   incognito: false,
 };
 

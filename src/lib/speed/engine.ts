@@ -3,7 +3,9 @@ import { useEffect, useRef } from "react";
 import { attachStream, cameraErrorMessage, openCamera } from "./camera";
 import { fleetById } from "./catalog";
 import { requestMotionPermission } from "./gps";
-import { findMovingRegions, lerpBox, pickLock, rgbaToGray } from "./motion";
+import { BoxKalman } from "./kalman";
+import { findMovingRegions, pickLock, rgbaToGray } from "./motion";
+import { assumedSpanM, lookupWheelbase } from "./wheelbase";
 import { FlowTracker, flowSpeedMps } from "./optical-flow";
 import {
   drawRoad,
@@ -73,6 +75,20 @@ function resizeCanvas(canvas: HTMLCanvasElement, cssW: number, cssH: number, dpr
   canvas.style.width = `${cssW}px`;
   canvas.style.height = `${cssH}px`;
   return { w, h };
+}
+
+function guideRect(w: number, h: number): BBox {
+  return { x: w * 0.19, y: h * 0.4, w: w * 0.62, h: h * 0.38 };
+}
+
+function drawGuide(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const r = guideRect(w, h);
+  ctx.save();
+  ctx.setLineDash([7, 6]);
+  ctx.strokeStyle = "rgba(197, 212, 222, 0.38)";
+  ctx.lineWidth = 1.4;
+  ctx.strokeRect(r.x, r.y, r.w, r.h);
+  ctx.restore();
 }
 
 function drawReticle(
@@ -158,6 +174,7 @@ export function useVeloxEngine(refs: EngineRefs) {
   useEffect(() => {
     const range = new RangeTracker();
     const flow = new FlowTracker(ANALYSIS_W, ANALYSIS_H);
+    const kf = new BoxKalman();
     let road: RoadState = { t: 0, distance: 0, speedMps: 0, heading: 18 };
     let cars: SimCar[] = seedCars();
     let prevGray: Uint8Array | null = null;
@@ -274,6 +291,14 @@ export function useVeloxEngine(refs: EngineRefs) {
                   h: lastBox.h / sy,
                 }
               : null,
+            settings.showGuide
+              ? {
+                  x: ANALYSIS_W * 0.19,
+                  y: ANALYSIS_H * 0.4,
+                  w: ANALYSIS_W * 0.62,
+                  h: ANALYSIS_H * 0.38,
+                }
+              : null,
           );
           if (chosen) {
             const bbox = {
@@ -282,9 +307,16 @@ export function useVeloxEngine(refs: EngineRefs) {
               w: chosen.w * sx,
               h: chosen.h * sy,
             };
+            kf.predict(dt);
+            kf.update(bbox, dt);
+            const filtered = kf.box();
+            const ident = store.identification;
+            const wb =
+              ident?.wheelbaseM ??
+              (ident ? lookupWheelbase(ident.make, ident.model, ident.klass) : null);
+            const span = assumedSpanM(filtered, settings.assumedWidthM, wb);
             const distGuess =
-              (settings.assumedWidthM * (canvasW / 2 / Math.tan(HFOV / 2))) /
-              Math.max(8, bbox.w);
+              (span * (canvasW / 2 / Math.tan(HFOV / 2))) / Math.max(8, filtered.w);
             const flowV = flowSpeedMps(
               fr.vectors,
               chosen,
@@ -294,21 +326,32 @@ export function useVeloxEngine(refs: EngineRefs) {
               HFOV,
             );
             range.push(
-              bbox,
+              filtered,
               canvasW,
-              settings.assumedWidthM,
+              span,
               settings.sensitivity,
               now,
               flowV.speedMps,
               flowV.confidence,
             );
-            const smoothed = lastBox ? lerpBox(lastBox, bbox, 0.38) : bbox;
             lock = {
               id: "live",
-              bbox: smoothed,
+              bbox: filtered,
               speedMps: range.speedMps,
               distanceM: range.distanceM,
               confidence: range.confidence,
+              fleetId: null,
+            };
+            held = lock;
+            holdUntil = now + 820;
+          } else if (kf.inited && kf.misses < 16) {
+            kf.predict(dt);
+            lock = {
+              id: "live",
+              bbox: kf.coast(),
+              speedMps: range.speedMps,
+              distanceM: range.distanceM,
+              confidence: range.confidence * 0.85,
               fleetId: null,
             };
             held = lock;
@@ -317,6 +360,7 @@ export function useVeloxEngine(refs: EngineRefs) {
             lock = held;
           } else {
             range.reset();
+            kf.reset();
             held = null;
           }
         }
@@ -325,6 +369,8 @@ export function useVeloxEngine(refs: EngineRefs) {
         prevGray = null;
         held = null;
         flow.reset();
+        kf.reset();
+        range.reset();
       }
 
       lastLockId = lock?.id ?? null;
@@ -347,6 +393,7 @@ export function useVeloxEngine(refs: EngineRefs) {
         const oCtx = overlay.getContext("2d");
         if (oCtx) {
           oCtx.clearRect(0, 0, overlay.width, overlay.height);
+          if (settings.showGuide) drawGuide(oCtx, overlay.width, overlay.height);
           if (settings.showBoxes) {
             for (const b of boxes) {
               oCtx.strokeStyle = "rgba(197, 212, 222, 0.28)";
@@ -404,7 +451,8 @@ export async function enableCamera(video: HTMLVideoElement | null) {
   }
   try {
     const facing = useVelox.getState().settings.cameraFacing;
-    const stream = await openCamera(facing);
+    const highFps = useVelox.getState().settings.highFps;
+    const stream = await openCamera(facing, highFps);
     video.removeAttribute("src");
     video.load();
     attachStream(video, stream);

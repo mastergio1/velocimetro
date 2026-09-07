@@ -4,7 +4,7 @@ import type { VehicleId } from "./types";
 const PROMPT = `Identifica CUALQUIER vehículo de la foto: auto, SUV, pickup, van, bus o coupé. Marcas de cualquier país (Europa, Japón, Corea, China, América, etc.). No te limites a marcas famosas. Si ves emblema o silueta, da la marca y el modelo más específico posible (ej. "BYD Song Plus", "Suzuki Swift", "Peugeot 208", "Chery Tiggo 2").
 PRIVACIDAD: ignora patentes, PPU, matrículas y cualquier texto de placa. Nunca las transcribas ni las cites en description o funFact. Si hay una barra negra sobre la placa, es intencional.
 Responde SOLO JSON válido, sin markdown:
-{"make":"marca o unknown","model":"modelo","year":"año o generación","color":"color","klass":"sedan|hatch|suv|pickup|van|sport|super|hyper|classic","description":"una frase breve en español, máximo 140 caracteres","funFact":"un dato curioso verdadero en español, máximo 180 caracteres"}
+{"make":"marca o unknown","model":"modelo","year":"año o generación","color":"color","klass":"sedan|hatch|suv|pickup|van|sport|super|hyper|classic","wheelbaseM":2.7,"description":"una frase breve en español, máximo 140 caracteres","funFact":"un dato curioso verdadero en español, máximo 180 caracteres"}
 Si no hay un vehículo claro, usa make "unknown".`;
 
 const RATE_WINDOW_MS = 60 * 60 * 1000;
@@ -47,6 +47,7 @@ export function extractJson(text: string): VehicleId | null {
   try {
     const raw = JSON.parse(trimmed.slice(start, end + 1)) as Partial<VehicleId>;
     if (!raw.make || raw.make === "unknown") return null;
+    const wb = Number(raw.wheelbaseM);
     return {
       make: clip(raw.make, 40),
       model: clip(raw.model, 48),
@@ -55,6 +56,7 @@ export function extractJson(text: string): VehicleId | null {
       description: clip(raw.description, 180),
       funFact: clip(raw.funFact, 220),
       klass: raw.klass ? clip(raw.klass, 24) : undefined,
+      wheelbaseM: Number.isFinite(wb) && wb >= 1.8 && wb <= 4.6 ? wb : undefined,
     };
   } catch {
     return null;

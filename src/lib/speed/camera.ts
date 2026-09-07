@@ -49,7 +49,10 @@ export function isInAppBrowser(): boolean {
     (/iPhone|iPad|iPod/i.test(ua) && !/Safari/i.test(ua));
 }
 
-export async function openCamera(facing: CameraFacing): Promise<MediaStream> {
+export async function openCamera(
+  facing: CameraFacing,
+  highFps = true,
+): Promise<MediaStream> {
   if (typeof window !== "undefined" && !window.isSecureContext) {
     const err = new Error("Insecure context");
     err.name = "SecurityError";
@@ -61,7 +64,18 @@ export async function openCamera(facing: CameraFacing): Promise<MediaStream> {
     throw err;
   }
 
+  const fps = highFps
+    ? { ideal: 60, min: 24 }
+    : { ideal: 30, max: 30 };
+
   const attempts: MediaTrackConstraints[] = [
+    {
+      facingMode: { ideal: facing },
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      frameRate: fps,
+    },
+    { facingMode: { ideal: facing }, frameRate: fps },
     { facingMode: { ideal: facing } },
     { facingMode: facing },
   ];

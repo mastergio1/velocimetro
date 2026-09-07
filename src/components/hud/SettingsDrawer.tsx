@@ -151,6 +151,28 @@ export function SettingsDrawer() {
 
               <div className="flex h-12 items-center justify-between gap-3 rounded-md border border-line bg-raised/70 px-3">
                 <div>
+                  <p className="text-sm font-medium text-fg">Guía de encuadre</p>
+                </div>
+                <Switch
+                  checked={settings.showGuide}
+                  onCheckedChange={(showGuide) => setSettings({ showGuide })}
+                  aria-label="Mostrar guía de encuadre"
+                />
+              </div>
+
+              <div className="flex h-12 items-center justify-between gap-3 rounded-md border border-line bg-raised/70 px-3">
+                <div>
+                  <p className="text-sm font-medium text-fg">60 fps</p>
+                </div>
+                <Switch
+                  checked={settings.highFps}
+                  onCheckedChange={(highFps) => setSettings({ highFps })}
+                  aria-label="Alta tasa de fotogramas"
+                />
+              </div>
+
+              <div className="flex h-12 items-center justify-between gap-3 rounded-md border border-line bg-raised/70 px-3">
+                <div>
                   <p className="text-sm font-medium text-fg">Cajas de detección</p>
                 </div>
                 <Switch

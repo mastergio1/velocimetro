@@ -42,7 +42,9 @@ function loadSettings(): Settings {
       assumedWidthM: num(parsed.assumedWidthM, 1.4, 2.2, DEFAULT_SETTINGS.assumedWidthM),
       sensitivity: num(parsed.sensitivity, 0.4, 2.4, DEFAULT_SETTINGS.sensitivity),
       speedLimitKmh: num(parsed.speedLimitKmh, 20, 400, DEFAULT_SETTINGS.speedLimitKmh),
-      showBoxes: parsed.showBoxes === false ? false : true,
+      showBoxes: parsed.showBoxes === true,
+      showGuide: parsed.showGuide === false ? false : true,
+      highFps: parsed.highFps === false ? false : true,
       incognito: parsed.incognito === true,
     };
   } catch {

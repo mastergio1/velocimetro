@@ -123,14 +123,24 @@ export function pickLock(
   frameH: number,
   prevId: string | null,
   prevBox: BBox | null,
+  roi: BBox | null = null,
 ): MotionBox | null {
   if (boxes.length === 0) return null;
+  let pool = boxes;
+  if (roi) {
+    const inside = boxes.filter((b) => {
+      const cx = b.x + b.w / 2;
+      const cy = b.y + b.h / 2;
+      return cx >= roi.x && cx <= roi.x + roi.w && cy >= roi.y && cy <= roi.y + roi.h;
+    });
+    if (inside.length) pool = inside;
+  }
   const cx = frameW / 2;
   const cy = frameH * 0.58;
   if (prevBox && prevId) {
     let sticky: MotionBox | null = null;
     let stickyIou = 0;
-    for (const b of boxes) {
+    for (const b of pool) {
       const o = iou(b, prevBox);
       if (o > stickyIou) {
         stickyIou = o;
@@ -139,16 +149,16 @@ export function pickLock(
     }
     if (sticky && stickyIou > 0.26) return sticky;
     if (sticky && stickyIou > 0.12) {
-      const center = boxes.reduce((best, b) => {
+      const center = pool.reduce((best, b) => {
         const d = dist2(b, cx, cy);
         return d < dist2(best, cx, cy) ? b : best;
-      }, boxes[0]!);
+      }, pool[0]!);
       if (sticky.score >= center.score * 0.55) return sticky;
     }
   }
-  let best = boxes[0]!;
+  let best = pool[0]!;
   let bestD = Infinity;
-  for (const b of boxes) {
+  for (const b of pool) {
     const d = dist2(b, cx, cy);
     if (d < bestD) {
       bestD = d;
