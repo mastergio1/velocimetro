@@ -159,7 +159,10 @@ export function VeloxApp() {
   }, [channel, lock?.id, identifiedLockId, identifyStatus]);
 
   return (
-    <main className="relative isolate h-dvh overflow-x-hidden bg-bg text-fg">
+    <main
+      className="relative isolate h-dvh min-h-[100svh] overflow-x-hidden bg-bg bg-cover bg-center text-fg"
+      style={{ backgroundImage: "url(/demo/night.jpg)" }}
+    >
       <video
         ref={videoRef}
         className={cn(
@@ -167,10 +170,10 @@ export function VeloxApp() {
           cameraReady ? "opacity-100" : "opacity-0",
         )}
         poster="/demo/night.jpg"
+        preload="none"
         loop
         playsInline
         muted
-        autoPlay
       />
       <canvas
         ref={simRef}

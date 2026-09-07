@@ -165,7 +165,10 @@ export function useVeloxEngine(refs: EngineRefs) {
   useEffect(() => {
     if (cameraOn) return;
     const video = refsRef.current.videoRef.current;
-    void playDemo(video);
+    const t = window.setTimeout(() => {
+      void playDemo(video);
+    }, 450);
+    return () => window.clearTimeout(t);
   }, [cameraOn]);
 
   useEffect(() => {
