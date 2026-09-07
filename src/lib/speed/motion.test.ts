@@ -32,7 +32,7 @@ describe("isVehicleLike", () => {
     assert.equal(isVehicleLike({ x: 80, y: 220, w: 90, h: 220 }, 390, 700, 5), false);
   });
 
-  it("accepts a mid-road car box", () => {
-    assert.equal(isVehicleLike({ x: 120, y: 280, w: 110, h: 55 }, 390, 700, 18), true);
+  it("accepts a close van crossing the intersection", () => {
+    assert.equal(isVehicleLike({ x: 40, y: 240, w: 160, h: 70 }, 390, 700, 5.2), true);
   });
 });

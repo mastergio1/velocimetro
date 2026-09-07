@@ -78,7 +78,7 @@ function resizeCanvas(canvas: HTMLCanvasElement, cssW: number, cssH: number, dpr
 }
 
 function guideRect(w: number, h: number): BBox {
-  return { x: w * 0.19, y: h * 0.4, w: w * 0.62, h: h * 0.38 };
+  return { x: w * 0.1, y: h * 0.26, w: w * 0.8, h: h * 0.44 };
 }
 
 function drawGuide(ctx: CanvasRenderingContext2D, w: number, h: number) {
@@ -99,7 +99,7 @@ function drawReticle(
   at?: { x: number; y: number },
 ) {
   const cx = at?.x ?? w / 2;
-  const cy = at?.y ?? h * 0.6;
+  const cy = at?.y ?? h * 0.42;
   const r = Math.min(w, h) * 0.09;
   ctx.strokeStyle = locked ? "rgba(197, 212, 222, 0.9)" : "rgba(197, 212, 222, 0.45)";
   ctx.lineWidth = Math.max(1.5, h * 0.002);
@@ -293,10 +293,10 @@ export function useVeloxEngine(refs: EngineRefs) {
               : null,
             settings.showGuide
               ? {
-                  x: ANALYSIS_W * 0.19,
-                  y: ANALYSIS_H * 0.4,
-                  w: ANALYSIS_W * 0.62,
-                  h: ANALYSIS_H * 0.38,
+                  x: ANALYSIS_W * 0.1,
+                  y: ANALYSIS_H * 0.26,
+                  w: ANALYSIS_W * 0.8,
+                  h: ANALYSIS_H * 0.44,
                 }
               : null,
           );
